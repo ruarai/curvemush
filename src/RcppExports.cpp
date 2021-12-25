@@ -11,20 +11,21 @@ Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
 // mush
-std::vector<std::vector<int>> mush(int n_start, int n_samples);
-RcppExport SEXP _curvemush_mush(SEXP n_startSEXP, SEXP n_samplesSEXP) {
+std::vector<std::vector<int>> mush(int n_start, int n_samples, int n_delay_samples);
+RcppExport SEXP _curvemush_mush(SEXP n_startSEXP, SEXP n_samplesSEXP, SEXP n_delay_samplesSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< int >::type n_start(n_startSEXP);
     Rcpp::traits::input_parameter< int >::type n_samples(n_samplesSEXP);
-    rcpp_result_gen = Rcpp::wrap(mush(n_start, n_samples));
+    Rcpp::traits::input_parameter< int >::type n_delay_samples(n_delay_samplesSEXP);
+    rcpp_result_gen = Rcpp::wrap(mush(n_start, n_samples, n_delay_samples));
     return rcpp_result_gen;
 END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_curvemush_mush", (DL_FUNC) &_curvemush_mush, 2},
+    {"_curvemush_mush", (DL_FUNC) &_curvemush_mush, 3},
     {NULL, NULL, 0}
 };
 
