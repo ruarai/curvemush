@@ -11,7 +11,7 @@ Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
 // mush
-std::vector<std::vector<int>> mush(int n_samples, int n_delay_samples, int steps_per_day);
+DataFrame mush(int n_samples, int n_delay_samples, int steps_per_day);
 RcppExport SEXP _curvemush_mush(SEXP n_samplesSEXP, SEXP n_delay_samplesSEXP, SEXP steps_per_daySEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;

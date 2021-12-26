@@ -4,6 +4,8 @@
 #include "musher.h"
 
 
+#define def_n_slots 2
+
 #define s_occupancy 0
 #define s_transitions 1
 
@@ -18,45 +20,60 @@ inline int fastrand() {
 
 // mush_curve
 // Performs the discrete-time stochastic simulation of the compartmental model
-std::vector<int> musher::mush_curve(mush_params params) {
-  int n_types = 2;
-  
+mush_results musher::mush_curve(mush_params params) {
   int n_steps = params.n_days * params.steps_per_day;
   
-  int n_compartments = params.n_compartments;
-  int n_array = n_steps * n_compartments * n_types;
+  int n_array = n_steps * def_n_compartments * def_n_slots;
   
   // Helper lambda function to index the data array
-  auto ix = [n_compartments, n_types] (int t, int compartment, int type) {
-    return t * n_compartments * n_types +
-      compartment * n_types + 
-      type;
+  auto ix = [] (int t, int compartment, int slot) {
+    return t * def_n_compartments * def_n_slots +
+      compartment * def_n_slots + 
+      slot;
   };
   
   
   std::vector<int> arr(n_array);
   
-  int n_start = 1000;
-  arr[ix(0, 0, 0)] = n_start;
-  arr[ix(0, 0, 1)] = n_start;
+  int n_start = 100000;
+  arr[ix(0, c_symptomatic, s_occupancy)] = n_start;
+  arr[ix(0, c_symptomatic, s_transitions)] = n_start;
   
   
   std::random_device rd;
   std::mt19937 rand(rd());
   
   std::vector<int> symptomatic_ward_delays = musher::make_delay_samples(
-    params.n_delay_samples, 1.582, 4.589, rand
-  );
-  std::vector<int> ward_to_discharge_delays = musher::make_delay_samples(
-    params.n_delay_samples, 0.907, 6.299, rand
-  );
-  std::vector<int> ward_to_ICU_delays = musher::make_delay_samples(
-    params.n_delay_samples, 0.515, 4.560, rand
-  );
-  std::vector<int> ward_to_death_delays = musher::make_delay_samples(
-    params.n_delay_samples, 1.931, 5.670, rand
+    params.n_delay_samples, 1.582, 4.589, params.steps_per_day, rand
   );
   
+  std::vector<int> ward_to_discharge_delays = musher::make_delay_samples(
+    params.n_delay_samples, 0.907, 6.299, params.steps_per_day, rand
+  );
+  std::vector<int> ward_to_ICU_delays = musher::make_delay_samples(
+    params.n_delay_samples, 0.515, 4.560, params.steps_per_day, rand
+  );
+  std::vector<int> ward_to_death_delays = musher::make_delay_samples(
+    params.n_delay_samples, 1.931, 5.670, params.steps_per_day, rand
+  );
+  
+  
+  std::vector<int> ICU_to_discharge_delays = musher::make_delay_samples(
+    params.n_delay_samples, 0.851, 22.51, params.steps_per_day, rand
+  );
+  std::vector<int> ICU_to_death_delays = musher::make_delay_samples(
+    params.n_delay_samples, 1.33, 12.03, params.steps_per_day, rand
+  );
+  std::vector<int> ICU_to_postICU_delays = musher::make_delay_samples(
+    params.n_delay_samples, 0.947, 11.62, params.steps_per_day, rand
+  );
+  
+  std::vector<int> postICU_to_discharge_delays = musher::make_delay_samples(
+    params.n_delay_samples, 1.53, 6.26, params.steps_per_day, rand
+  );
+  std::vector<int> postICU_to_death_delays = musher::make_delay_samples(
+    params.n_delay_samples, 1.68, 2.55, params.steps_per_day, rand
+  );
   
   int n_delay_samples = params.n_delay_samples;
   
@@ -64,46 +81,73 @@ std::vector<int> musher::mush_curve(mush_params params) {
     // Update the current occupancy value to reflect the value at the last timestep
     // counted at arr[ix(t - 1, c, s_occupancy)]
     // plus/minus any transitions (counted by arr[ix(t, c, s_occupancy)])
-    for(int c = 0; c < n_compartments; c++) {
+    for(int c = 0; c < def_n_compartments; c++) {
       if(t > 0)
         arr[ix(t, c, s_occupancy)] = arr[ix(t, c, s_occupancy)] + arr[ix(t - 1, c, s_occupancy)];
     }
     
     
     
-    musher::transition_symptomatic_ward(t, arr, ix, 
-                                        symptomatic_ward_delays,
-                                        n_steps);
+    // Symptomatic -> ward
+    musher::transition_generic_delayed(
+      c_symptomatic, c_ward,
+      arr[ix(t, c_symptomatic, s_transitions)],
+      t, arr, ix,
+      symptomatic_ward_delays,
+      n_steps
+    );
     
-    musher::transition_ward_next(t, arr, ix,
-                                 ward_to_discharge_delays,
-                                 ward_to_ICU_delays,
-                                 ward_to_death_delays,
-                                 0.1, 0.2,
-                                 n_steps, rand);
-  }       
+    // Ward -> ICU, discharged, died
+    musher::transition_ward_next(
+      t, arr, ix,
+      ward_to_discharge_delays, ward_to_ICU_delays, ward_to_death_delays,
+      0.1, 0.2,
+      n_steps, rand);
+    
+    // ICU -> discharged, died, postICU
+    musher::transition_ICU_next(
+      t, arr, ix,
+      ICU_to_discharge_delays, ICU_to_death_delays, ICU_to_postICU_delays,
+      0.1, 0.2, 0.2,
+      n_steps, rand);
+    
+    
+    // PostICU -> discharged
+    musher::transition_generic_delayed(
+      c_postICU_to_discharge, c_discharged_postICU,
+      arr[ix(t, c_postICU_to_discharge, s_transitions)],
+      t, arr, ix,
+      ICU_to_discharge_delays,
+      n_steps
+    );
+    
+    // PostICU -> died
+    musher::transition_generic_delayed(
+      c_postICU_to_death, c_died_postICU,
+      arr[ix(t, c_postICU_to_death, s_transitions)],
+      t, arr, ix,
+      ICU_to_discharge_delays,
+      n_steps
+    );
+  }
+  
+  std::vector<int> occupancy_counts(params.n_days * def_n_compartments);
+  std::vector<int> occupancy_compartment_labels(params.n_days * def_n_compartments);
+  
+  for(int c = 0; c < def_n_compartments; c++) {
+    for(int day = 0; day < params.n_days; day++) {
+      occupancy_counts[c * params.n_days + day] = arr[ix(day * params.steps_per_day, c, s_occupancy)];
+      occupancy_compartment_labels[c * params.n_days + day] = c;
+    }
+  }
+  
+  // Be more memory-efficient here maybe
+  mush_results results;
+  results.occupancy_compartment_labels = occupancy_compartment_labels;
+  results.occupancy_counts = occupancy_counts;
   
   
-  return arr;
-}
-
-
-template <typename F>
-void musher::transition_symptomatic_ward(
-    int t,
-    std::vector<int> &arr,
-    F ix,
-    std::vector<int> &symptomatic_ward_delays,
-    int n_steps
-) {
-  int n_to_transition = arr[ix(t, 0, s_transitions)];
-  
-  transition_generic_delayed(
-    0, 1, n_to_transition,
-    t, arr, ix,
-    symptomatic_ward_delays,
-    n_steps
-  );
+  return results;
 }
 
 
@@ -123,7 +167,7 @@ void musher::transition_ward_next(
     
     std::mt19937 &rand
 ) {
-  int n_to_transition = arr[ix(t, 1, s_transitions)];
+  int n_to_transition = arr[ix(t, c_ward, s_transitions)];
   
   int n_to_discharge = 0;
   int n_to_ICU = 0;
@@ -131,9 +175,6 @@ void musher::transition_ward_next(
   
   
   std::uniform_real_distribution<> dist(0, 1);
-  
-  // Need a faster way to do multinomial sampling, probably
-  // but for now, this is faster than it looks
   for(int i = 0; i < n_to_transition; i++) {
     float rand_sample = dist(rand);
     
@@ -147,22 +188,96 @@ void musher::transition_ward_next(
   }
   
   
-  transition_generic_delayed(
-    1, 2, n_to_discharge,
+  musher::transition_generic_delayed(
+    c_ward, c_discharged_ward, n_to_discharge,
     t, arr, ix,
     ward_to_discharge_delays,
     n_steps
   );
-  transition_generic_delayed(
-    1, 3, n_to_ICU,
+  musher::transition_generic_delayed(
+    c_ward, c_ICU, n_to_ICU,
     t, arr, ix,
     ward_to_ICU_delays,
     n_steps
   );
-  transition_generic_delayed(
-    1, 4, n_to_death,
+  musher::transition_generic_delayed(
+    c_ward, c_died_ward, n_to_death,
     t, arr, ix,
     ward_to_death_delays,
+    n_steps
+  );
+  
+}
+
+
+
+template <typename F>
+void musher::transition_ICU_next(
+    int t,
+    std::vector<int> &arr,
+    F ix,
+    
+    std::vector<int> &ICU_to_discharge_delays,
+    std::vector<int> &ICU_to_death_delays,
+    std::vector<int> &ICU_to_postICU_delays,
+    float pr_ICU_to_death,
+    float pr_ICU_to_discharge,
+    float pr_postICU_to_death,
+    
+    int n_steps,
+    
+    std::mt19937 &rand
+) {
+  int n_to_transition = arr[ix(t, c_ICU, s_transitions)];
+  
+  int n_to_discharge = 0;
+  int n_to_death = 0;
+  int n_to_postICU_death = 0;
+  int n_to_postICU_discharge = 0;
+  
+  
+  std::uniform_real_distribution<> dist(0, 1);
+  for(int i = 0; i < n_to_transition; i++) {
+    float rand_sample = dist(rand);
+    
+    if(rand_sample < pr_ICU_to_discharge) {
+      n_to_discharge++;
+    } else if(rand_sample < pr_ICU_to_discharge + pr_ICU_to_death) {
+      n_to_death++;
+    } else {
+      float postICU_sample = dist(rand);
+      
+      if(postICU_sample < pr_postICU_to_death)
+        n_to_postICU_death++;
+      else
+        n_to_postICU_discharge++;
+      
+    }
+  }
+  
+  
+  musher::transition_generic_delayed(
+    c_ICU, c_discharged_ICU, n_to_discharge,
+    t, arr, ix,
+    ICU_to_discharge_delays,
+    n_steps
+  );
+  musher::transition_generic_delayed(
+    c_ICU, c_died_ICU, n_to_death,
+    t, arr, ix,
+    ICU_to_death_delays,
+    n_steps
+  );
+  musher::transition_generic_delayed(
+    c_ICU, c_postICU_to_death, n_to_postICU_death,
+    t, arr, ix,
+    ICU_to_postICU_delays,
+    n_steps
+  );
+  musher::transition_generic_delayed(
+    c_ICU, c_postICU_to_discharge, n_to_postICU_discharge,
+    t, arr, ix,
+    ICU_to_postICU_delays,
     n_steps
   );
   
@@ -194,11 +309,6 @@ void musher::transition_generic_delayed(
     if(t_set >= n_steps)
       continue;
     
-    if(ix(t_set, c_to, s_transitions) >= 5 * 100 * 2) {
-      RcppThread::Rcout << ix(t_set, c_to, s_transitions) << " ";
-      RcppThread::Rcout << "(" << t_set << ", " << c_to << ", " << s_transitions << ") ";
-    }
-    
     // We need to handle this transition in the future
     arr[ix(t_set, c_to, s_transitions)]++;
     
@@ -212,14 +322,14 @@ void musher::transition_generic_delayed(
 
 
 std::vector<int> musher::make_delay_samples(
-    int n_samples, double shape, double scale, std::mt19937 &rand
+    int n_samples, double shape, double scale, int steps_per_day, std::mt19937 &rand
   ) {
   std::vector<int> samples(n_samples);
   
   std::gamma_distribution<> delay_dist(shape, scale);
   
   for(int i = 0; i < n_samples; i++)
-    samples[i] = std::floor(delay_dist(rand));
+    samples[i] = std::floor(delay_dist(rand) * steps_per_day);
   
   return samples;
 }

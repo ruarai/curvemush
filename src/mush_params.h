@@ -1,8 +1,6 @@
 #pragma once
 
 struct mush_params {
-  int n_compartments;
-  
   int n_days;
   
   int steps_per_day;

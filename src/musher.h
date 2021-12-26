@@ -1,20 +1,18 @@
 
 #pragma once
 #include "mush_params.h"
+#include "mush_compartments.h"
 #include <random>
+
+
+struct mush_results {
+  std::vector<int> occupancy_counts;
+  std::vector<int> occupancy_compartment_labels;
+};
 
 class musher {
 public:
-  static std::vector<int> mush_curve(mush_params params);
-  
-  template <typename F>
-  static void transition_symptomatic_ward(
-      int t,
-      std::vector<int> &arr,
-      F ix,
-      std::vector<int> &symptomatic_ward_delays,
-      int n_steps
-    );
+  static mush_results mush_curve(mush_params params);
   
   template <typename F>
   static void transition_ward_next(
@@ -33,6 +31,23 @@ public:
       std::mt19937 &rand
     );
   
+  template <typename F>
+  static void transition_ICU_next(
+      int t,
+      std::vector<int> &arr,
+      F ix,
+      
+      std::vector<int> &ICU_to_discharge_delays,
+      std::vector<int> &ICU_to_death_delays,
+      std::vector<int> &ICU_to_postICU_delays,
+      float pr_ICU_to_death,
+      float pr_ICU_to_discharge,
+      float pr_postICU_to_death,
+      
+      int n_steps,
+      
+      std::mt19937 &rand
+  );
   
   
   template <typename F>
@@ -49,6 +64,6 @@ public:
   
 private:
   static std::vector<int> make_delay_samples(
-      int n_samples, double shape, double scale, std::mt19937 &rand
+      int n_samples, double shape, double scale, int steps_per_day, std::mt19937 &rand
   );
 };

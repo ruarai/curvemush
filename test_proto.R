@@ -1,14 +1,14 @@
 library(curvemush)
 
-n_compartments <- 5
+library(ggplot2)
 
-ix <- function(t, compartment, type) {
-  return((t - 1) * n_compartments * 2 + (compartment - 1) * 2 + type)
-}
 
-n_samples <- 1000
+
+
+
+n_samples <- 10000
 n_many <- 1000
-steps_per_day <- 4
+steps_per_day <- 8
 a <- Sys.time()
 
 results <- mush(n_samples,
@@ -17,19 +17,21 @@ results <- mush(n_samples,
 
 b <- Sys.time()
 
+compartment_labels <- c(
+  "susceptible", "symptomatic", "ward", "discharged_ward", "died_ward", "ICU", "discharged_ICU", "died_ICU",
+  "postICU_to_discharge", "postICU_to_death", "discharged_postICU", "died_postICU"
+)
 
-n_time <- length(results[[1]]) / (2 * n_compartments * steps_per_day)
+results$compartment <- compartment_labels[results$compartment + 1]
 
-plot(results[[1]][ix(1:n_time, 1, 1)], type ='l', col = rgb(1,0,0,0.1), ylim = c(0,n_many))
 
-for(j in 1:100) {
-  lines(results[[j]][ix(1:n_time, 1, 1)], type ='l', col= rgb(1,0,0,0.1))
-  
-  for(i in 2:n_compartments){
-    p <- i/n_compartments
-    lines(results[[j]][ix(1:n_time, i, 1)], type ='l', col = rgb(1-p,p/2,p,0.1))
-  }
-  
-}
+
+ggplot(results %>% filter(t_step == max(t_step), sample < 1000)) +
+  geom_point(aes(y = compartment, x = count))
+
+
+ggplot(results %>% filter(sample < 100)) +
+  geom_line(aes(x = t_step, y = count, group = interaction(compartment, sample), color = compartment))
+
 
 print(b - a)
