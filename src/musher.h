@@ -2,17 +2,22 @@
 #pragma once
 #include "mush_params.h"
 #include "mush_compartments.h"
+#include "group_data.h"
 #include <random>
 
 
 struct mush_results {
-  std::vector<int> occupancy_counts;
-  std::vector<int> occupancy_compartment_labels;
+  std::vector<int> grouped_occupancy_counts;
+  std::vector<int> grouped_occupancy_compartment_labels;
 };
 
 class musher {
 public:
-  static mush_results mush_curve(mush_params params);
+  static mush_results mush_curve(
+      mush_params params,
+      
+      std::vector<int> hosp_curve
+  );
   
   template <typename F>
   static void transition_ward_next(
@@ -66,4 +71,7 @@ private:
   static std::vector<int> make_delay_samples(
       int n_samples, double shape, double scale, int steps_per_day, std::mt19937 &rand
   );
+  
+  static int group_compartment(int compartment_id);
+  
 };

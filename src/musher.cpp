@@ -20,7 +20,10 @@ inline int fastrand() {
 
 // mush_curve
 // Performs the discrete-time stochastic simulation of the compartmental model
-mush_results musher::mush_curve(mush_params params) {
+mush_results musher::mush_curve(
+    mush_params params,
+    std::vector<int> hosp_curve
+  ) {
   int n_steps = params.n_days * params.steps_per_day;
   
   int n_array = n_steps * def_n_compartments * def_n_slots;
@@ -35,10 +38,10 @@ mush_results musher::mush_curve(mush_params params) {
   
   std::vector<int> arr(n_array);
   
-  int n_start = 100000;
-  arr[ix(0, c_symptomatic, s_occupancy)] = n_start;
-  arr[ix(0, c_symptomatic, s_transitions)] = n_start;
-  
+  for(int d = 0; d < hosp_curve.size(); d++) {
+    arr[ix(d * params.steps_per_day, c_symptomatic, s_occupancy)] = hosp_curve[d];
+    arr[ix(d * params.steps_per_day, c_symptomatic, s_transitions)] = hosp_curve[d];
+  }
   
   std::random_device rd;
   std::mt19937 rand(rd());
@@ -131,20 +134,25 @@ mush_results musher::mush_curve(mush_params params) {
     );
   }
   
-  std::vector<int> occupancy_counts(params.n_days * def_n_compartments);
-  std::vector<int> occupancy_compartment_labels(params.n_days * def_n_compartments);
+  std::vector<int> grouped_occupancy_counts(params.n_days * def_n_compartment_groups);
+  std::vector<int> grouped_occupancy_compartment_labels(params.n_days * def_n_compartment_groups);
   
   for(int c = 0; c < def_n_compartments; c++) {
+    
+    int c_grp = group_compartment(c);
     for(int day = 0; day < params.n_days; day++) {
-      occupancy_counts[c * params.n_days + day] = arr[ix(day * params.steps_per_day, c, s_occupancy)];
-      occupancy_compartment_labels[c * params.n_days + day] = c;
+      int n_occupancy = arr[ix(day * params.steps_per_day, c, s_occupancy)];
+      
+      
+      grouped_occupancy_counts[c_grp * params.n_days + day] += n_occupancy;
+      grouped_occupancy_compartment_labels[c_grp * params.n_days + day] = c_grp;
     }
   }
   
-  // Be more memory-efficient here maybe
   mush_results results;
-  results.occupancy_compartment_labels = occupancy_compartment_labels;
-  results.occupancy_counts = occupancy_counts;
+  
+  results.grouped_occupancy_counts = grouped_occupancy_counts;
+  results.grouped_occupancy_compartment_labels = grouped_occupancy_compartment_labels;
   
   
   return results;
@@ -335,4 +343,26 @@ std::vector<int> musher::make_delay_samples(
 }
 
 
-
+int musher::group_compartment(int compartment_id) {
+  switch(compartment_id) {
+  case c_symptomatic:
+    return cgrp_symptomatic;
+  case c_ward:
+  case c_postICU_to_death:
+  case c_postICU_to_discharge:
+    return cgrp_ward;
+  case c_ICU:
+    return cgrp_ICU;
+  case c_discharged_ward:
+  case c_discharged_ICU:
+  case c_discharged_postICU:
+    return cgrp_discharged;
+  case c_died_ward:
+  case c_died_ICU:
+  case c_died_postICU:
+    return cgrp_died;
+  default:
+    return -1;
+    
+  }
+}

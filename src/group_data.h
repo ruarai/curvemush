@@ -1,9 +1,6 @@
 
 
 struct group_data {
-  
-  std::vector<int> n_hospitalised_cases;
-  
   float pr_ward_to_death;
   std::vector<float> pr_ward_to_ICU;
   
