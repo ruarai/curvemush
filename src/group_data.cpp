@@ -6,7 +6,7 @@ group_data group_data::read_group_data(DataFrame forecasting_parameters, int gro
 
     group_data data;
 
-    data.pr_case_given_age = as<NumericVector>(forecasting_parameters["pr_case_given_age"])[group_ix];
+    data.pr_age_given_case = as<NumericVector>(forecasting_parameters["pr_age_given_case"])[group_ix];
     data.pr_hosp = as<NumericVector>(forecasting_parameters["pr_hosp"])[group_ix];
 
     data.pr_ward_to_discharge = as<NumericVector>(forecasting_parameters["pr_ward_to_discharge"])[group_ix];

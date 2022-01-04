@@ -4,7 +4,7 @@
 using namespace Rcpp;
 
 struct group_data {
-  float pr_case_given_age;
+  float pr_age_given_case;
   float pr_hosp;
 
 

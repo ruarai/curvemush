@@ -2,6 +2,8 @@
 
 #pragma once
 
+#define def_n_groups 9
+
 #define def_n_compartments 11
 
 #define c_symptomatic 0
