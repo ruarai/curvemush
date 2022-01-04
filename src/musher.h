@@ -16,7 +16,9 @@ public:
   static mush_results mush_curve(
       mush_params params,
       
-      std::vector<int> hosp_curve
+      std::vector<int> case_curve,
+
+      group_data g_data
   );
   
   template <typename F>
@@ -28,7 +30,7 @@ public:
       std::vector<int> &ward_to_discharge_delays,
       std::vector<int> &ward_to_ICU_delays,
       std::vector<int> &ward_to_death_delays,
-      float pr_ward_to_death,
+      float pr_ward_to_discharge,
       float pr_ward_to_ICU,
       
       int n_steps,
@@ -45,8 +47,8 @@ public:
       std::vector<int> &ICU_to_discharge_delays,
       std::vector<int> &ICU_to_death_delays,
       std::vector<int> &ICU_to_postICU_delays,
-      float pr_ICU_to_death,
       float pr_ICU_to_discharge,
+      float pr_ICU_to_postICU,
       float pr_postICU_to_death,
       
       int n_steps,

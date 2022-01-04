@@ -11,8 +11,8 @@ Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
 // mush
-DataFrame mush(int n_samples, int n_delay_samples, int n_days, int steps_per_day, int t_forecast_start, NumericMatrix ensemble_curves);
-RcppExport SEXP _curvemush_mush(SEXP n_samplesSEXP, SEXP n_delay_samplesSEXP, SEXP n_daysSEXP, SEXP steps_per_daySEXP, SEXP t_forecast_startSEXP, SEXP ensemble_curvesSEXP) {
+DataFrame mush(int n_samples, int n_delay_samples, int n_days, int steps_per_day, int t_forecast_start, NumericMatrix ensemble_curves, DataFrame forecasting_parameters);
+RcppExport SEXP _curvemush_mush(SEXP n_samplesSEXP, SEXP n_delay_samplesSEXP, SEXP n_daysSEXP, SEXP steps_per_daySEXP, SEXP t_forecast_startSEXP, SEXP ensemble_curvesSEXP, SEXP forecasting_parametersSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -22,13 +22,14 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< int >::type steps_per_day(steps_per_daySEXP);
     Rcpp::traits::input_parameter< int >::type t_forecast_start(t_forecast_startSEXP);
     Rcpp::traits::input_parameter< NumericMatrix >::type ensemble_curves(ensemble_curvesSEXP);
-    rcpp_result_gen = Rcpp::wrap(mush(n_samples, n_delay_samples, n_days, steps_per_day, t_forecast_start, ensemble_curves));
+    Rcpp::traits::input_parameter< DataFrame >::type forecasting_parameters(forecasting_parametersSEXP);
+    rcpp_result_gen = Rcpp::wrap(mush(n_samples, n_delay_samples, n_days, steps_per_day, t_forecast_start, ensemble_curves, forecasting_parameters));
     return rcpp_result_gen;
 END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_curvemush_mush", (DL_FUNC) &_curvemush_mush, 6},
+    {"_curvemush_mush", (DL_FUNC) &_curvemush_mush, 7},
     {NULL, NULL, 0}
 };
 

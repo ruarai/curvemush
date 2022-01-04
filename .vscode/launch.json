@@ -12,7 +12,7 @@
       "args": [
         "--vanilla",
         "-e",
-        "source('simple_debug.R')"
+        "source('.vscode/run_debug.R')"
       ],
       "stopAtEntry": false,
       "envFile": "${workspaceFolder}/.vscode/.env",

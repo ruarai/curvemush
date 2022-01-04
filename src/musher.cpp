@@ -22,7 +22,10 @@ inline int fastrand() {
 // Performs the discrete-time stochastic simulation of the compartmental model
 mush_results musher::mush_curve(
     mush_params params,
-    std::vector<int> hosp_curve
+
+    std::vector<int> case_curve,
+
+    group_data g_data
   ) {
   int n_steps = params.n_days * params.steps_per_day;
   
@@ -38,45 +41,45 @@ mush_results musher::mush_curve(
   
   std::vector<int> arr(n_array);
   
-  for(int d = 0; d < hosp_curve.size(); d++) {
-    arr[ix(d * params.steps_per_day, c_symptomatic, s_occupancy)] = hosp_curve[d];
-    arr[ix(d * params.steps_per_day, c_symptomatic, s_transitions)] = hosp_curve[d];
+  for(int d = 0; d < case_curve.size(); d++) {
+    arr[ix(d * params.steps_per_day, c_symptomatic, s_occupancy)] = case_curve[d];
+    arr[ix(d * params.steps_per_day, c_symptomatic, s_transitions)] = case_curve[d];
   }
   
   std::random_device rd;
   std::mt19937 rand(rd());
   
   std::vector<int> symptomatic_ward_delays = musher::make_delay_samples(
-    params.n_delay_samples, 1.582, 4.589, params.steps_per_day, rand
-  );
+    params.n_delay_samples, g_data.d_shape_symptomatic_to_ward, g_data.d_scale_symptomatic_to_ward,
+    params.steps_per_day, rand);
   
   std::vector<int> ward_to_discharge_delays = musher::make_delay_samples(
-    params.n_delay_samples, 0.907, 6.299, params.steps_per_day, rand
-  );
+    params.n_delay_samples, g_data.d_shape_ward_to_discharge, g_data.d_scale_ward_to_discharge,
+    params.steps_per_day, rand);
   std::vector<int> ward_to_ICU_delays = musher::make_delay_samples(
-    params.n_delay_samples, 0.515, 4.560, params.steps_per_day, rand
-  );
+    params.n_delay_samples, g_data.d_shape_ward_to_ICU, g_data.d_scale_ward_to_ICU,
+    params.steps_per_day, rand);
   std::vector<int> ward_to_death_delays = musher::make_delay_samples(
-    params.n_delay_samples, 1.931, 5.670, params.steps_per_day, rand
-  );
+    params.n_delay_samples, g_data.d_shape_ward_to_death, g_data.d_scale_ward_to_death,
+    params.steps_per_day, rand);
   
   
   std::vector<int> ICU_to_discharge_delays = musher::make_delay_samples(
-    params.n_delay_samples, 0.851, 22.51, params.steps_per_day, rand
-  );
+    params.n_delay_samples, g_data.d_shape_ICU_to_discharge, g_data.pr_ICU_to_discharge,
+    params.steps_per_day, rand);
   std::vector<int> ICU_to_death_delays = musher::make_delay_samples(
-    params.n_delay_samples, 1.33, 12.03, params.steps_per_day, rand
-  );
+    params.n_delay_samples, g_data.d_shape_ICU_to_death, g_data.d_scale_ICU_to_death,
+    params.steps_per_day, rand);
   std::vector<int> ICU_to_postICU_delays = musher::make_delay_samples(
-    params.n_delay_samples, 0.947, 11.62, params.steps_per_day, rand
-  );
+    params.n_delay_samples, g_data.d_shape_ICU_to_postICU, g_data.d_scale_ICU_to_postICU,
+    params.steps_per_day, rand);
   
   std::vector<int> postICU_to_discharge_delays = musher::make_delay_samples(
-    params.n_delay_samples, 1.53, 6.26, params.steps_per_day, rand
-  );
+    params.n_delay_samples, g_data.d_shape_postICU_to_discharge, g_data.d_scale_postICU_to_discharge, 
+    params.steps_per_day, rand);
   std::vector<int> postICU_to_death_delays = musher::make_delay_samples(
-    params.n_delay_samples, 1.68, 2.55, params.steps_per_day, rand
-  );
+    params.n_delay_samples, g_data.d_shape_postICU_to_death, g_data.d_scale_postICU_to_death,
+    params.steps_per_day, rand);
   
   int n_delay_samples = params.n_delay_samples;
   
@@ -104,14 +107,14 @@ mush_results musher::mush_curve(
     musher::transition_ward_next(
       t, arr, ix,
       ward_to_discharge_delays, ward_to_ICU_delays, ward_to_death_delays,
-      0.1, 0.2,
+      g_data.pr_ward_to_discharge, g_data.pr_ward_to_ICU,
       n_steps, rand);
     
     // ICU -> discharged, died, postICU
     musher::transition_ICU_next(
       t, arr, ix,
       ICU_to_discharge_delays, ICU_to_death_delays, ICU_to_postICU_delays,
-      0.1, 0.2, 0.2,
+      g_data.pr_ICU_to_discharge, g_data.pr_ICU_to_postICU, g_data.pr_postICU_to_death,
       n_steps, rand);
     
     
@@ -168,7 +171,7 @@ void musher::transition_ward_next(
     std::vector<int> &ward_to_discharge_delays,
     std::vector<int> &ward_to_ICU_delays,
     std::vector<int> &ward_to_death_delays,
-    float pr_ward_to_death,
+    float pr_ward_to_discharge,
     float pr_ward_to_ICU,
     
     int n_steps,
@@ -186,12 +189,12 @@ void musher::transition_ward_next(
   for(int i = 0; i < n_to_transition; i++) {
     float rand_sample = dist(rand);
     
-    if(rand_sample < pr_ward_to_death) {
-      n_to_death++;
-    } else if(rand_sample < pr_ward_to_death + pr_ward_to_ICU) {
+    if(rand_sample < pr_ward_to_discharge) {
+      n_to_discharge++;
+    } else if(rand_sample < pr_ward_to_discharge + pr_ward_to_ICU) {
       n_to_ICU++;
     } else{
-      n_to_discharge++;
+      n_to_death++;
     }
   }
   
@@ -228,8 +231,8 @@ void musher::transition_ICU_next(
     std::vector<int> &ICU_to_discharge_delays,
     std::vector<int> &ICU_to_death_delays,
     std::vector<int> &ICU_to_postICU_delays,
-    float pr_ICU_to_death,
     float pr_ICU_to_discharge,
+    float pr_ICU_to_postICU,
     float pr_postICU_to_death,
     
     int n_steps,
@@ -250,9 +253,7 @@ void musher::transition_ICU_next(
     
     if(rand_sample < pr_ICU_to_discharge) {
       n_to_discharge++;
-    } else if(rand_sample < pr_ICU_to_discharge + pr_ICU_to_death) {
-      n_to_death++;
-    } else {
+    } else if(rand_sample < pr_ICU_to_discharge + pr_ICU_to_postICU) {
       float postICU_sample = dist(rand);
       
       if(postICU_sample < pr_postICU_to_death)
@@ -260,6 +261,8 @@ void musher::transition_ICU_next(
       else
         n_to_postICU_discharge++;
       
+    } else {
+      n_to_death++;
     }
   }
   

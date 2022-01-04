@@ -16,7 +16,9 @@ DataFrame mush(
   
   int t_forecast_start,
   
-  NumericMatrix ensemble_curves
+  NumericMatrix ensemble_curves,
+
+  DataFrame forecasting_parameters
 ) {
   
   mush_params params;
@@ -25,36 +27,49 @@ DataFrame mush(
   params.n_delay_samples = n_delay_samples;
   
   std::vector<std::vector<int>> hosp_curves(n_samples);
+
+  int group_ix = 5;
+
+  group_data g_data = group_data::read_group_data(forecasting_parameters, group_ix);
   
   int n_curves = ensemble_curves.ncol();
-  
+
+  // Producing n_samples case/hospitalisation trajectories to feed into the model:
   for(int i = 0; i < n_samples; i++) {
+    // Select a curve from our backcast/ensemble curve matrix
+    // Looping (by % n_curves) if we are performing more samples than we have ensembles
     NumericVector curve_i = ensemble_curves(_, i % n_curves);
     
-    hosp_curves[i] = std::vector<int>(n_days, -1);
+    hosp_curves[i] = std::vector<int>(n_days, 0);
     
-    for(int d = 0; d < t_forecast_start; d++) {
-      hosp_curves[i][d] = curve_i[d * 9];
-    }
+    // Over the backcast period, cases are split by age group
+    for(int d = 0; d < t_forecast_start; d++)
+      hosp_curves[i][d] = curve_i[d * 9 + group_ix];
     
+    // But in the forecast period, we perform the age sampling ourselves
     for(int d = 0; d < n_days - t_forecast_start; d++) {
       int n_cases = curve_i[t_forecast_start * 9 + d];
-      
+
+      // Better something here, maybe?
       for(int j = 0; j < n_cases; j++) {
-        if(R::runif(0, 1) < 0.1)
+        if(R::runif(0, 1) < g_data.pr_hosp * g_data.pr_case_given_age)
           hosp_curves[i][t_forecast_start + d]++;
       }
 
     }
   }
   
+  // Perform our simulations in parallel using RcppThread
+  // Important: can't use R data structures within threads!
   std::vector<mush_results> results(n_samples);
   RcppThread::parallelFor(
     0, n_samples,
-    [&results, params, &hosp_curves] (unsigned int i) {
-    results[i] = musher::mush_curve(params, hosp_curves[i]);
+    [&results, params, &hosp_curves, g_data] (unsigned int i) {
+    results[i] = musher::mush_curve(params, hosp_curves[i], g_data);
   });
   
+
+  // Build out our result dataframe to return
   int result_size = params.n_days * def_n_compartment_groups;
   int n_results = n_samples * result_size;
   

@@ -149,7 +149,8 @@ results_quants <- results %>%
          group = group_labels[compartment_group + 1])
 
 
-ggplot(results_quants) +
+ggplot(results_quants %>% 
+         filter(group == "ward" | group == "ICU")) +
   geom_ribbon(aes(x = date, ymin = lower, ymax = upper, group = quant),
               fill = 'blue3', alpha = 0.2) +
   

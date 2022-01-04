@@ -1,11 +1,18 @@
 
+#include <Rcpp.h>
+
+using namespace Rcpp;
 
 struct group_data {
-  float pr_ward_to_death;
-  std::vector<float> pr_ward_to_ICU;
-  
-  float pr_ICU_to_death;
+  float pr_case_given_age;
+  float pr_hosp;
+
+
+  float pr_ward_to_discharge;
+  float pr_ward_to_ICU;
+
   float pr_ICU_to_discharge;
+  float pr_ICU_to_postICU;
   
   float pr_postICU_to_death;
   
@@ -24,4 +31,7 @@ struct group_data {
   
   float d_shape_postICU_to_discharge, d_scale_postICU_to_discharge;
   float d_shape_postICU_to_death, d_scale_postICU_to_death;
+
+
+  static group_data read_group_data(DataFrame forecasting_parameters, int group_ix);
 };
