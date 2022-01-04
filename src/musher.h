@@ -7,8 +7,10 @@
 
 
 struct mush_results {
-  std::vector<int> grouped_occupancy_counts;
   std::vector<int> grouped_occupancy_compartment_labels;
+  
+  std::vector<int> grouped_occupancy_counts;
+  std::vector<int> grouped_transitions;
 };
 
 class musher {

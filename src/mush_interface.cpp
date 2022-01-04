@@ -113,6 +113,7 @@ DataFrame mush(
   NumericVector t_day(n_results);
   NumericVector compartment_group_label(n_results);
   NumericVector compartment_group_count(n_results);
+  NumericVector compartment_group_transitions(n_results);
   
   for(int i = 0; i < n_samples; i++) {
     for(int x = 0; x < result_size; x++) {
@@ -123,8 +124,11 @@ DataFrame mush(
       compartment_group_label[ix] = results[0][i].grouped_occupancy_compartment_labels[x];
 
       compartment_group_count[ix] = 0;
-      for(int g = 0; g < def_n_groups; g++)
+      compartment_group_transitions[ix] = 0;
+      for(int g = 0; g < def_n_groups; g++) {
         compartment_group_count[ix] += results[g][i].grouped_occupancy_counts[x];
+        compartment_group_transitions[ix] += results[g][i].grouped_transitions[x];
+      }
     }
   }
   
@@ -132,7 +136,8 @@ DataFrame mush(
     _["sample"] = sample_label,
     _["t_day"] = t_day,
     _["compartment_group"] = compartment_group_label,
-    _["count"] = compartment_group_count
+    _["count"] = compartment_group_count,
+    _["transitions"] = compartment_group_transitions
   );
   
   

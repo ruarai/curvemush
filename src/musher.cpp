@@ -137,26 +137,30 @@ mush_results musher::mush_curve(
     );
   }
   
-  std::vector<int> grouped_occupancy_counts(params.n_days * def_n_compartment_groups);
-  std::vector<int> grouped_occupancy_compartment_labels(params.n_days * def_n_compartment_groups);
+  std::vector<int> grouped_occupancy_compartment_labels(params.n_days * def_n_compartment_groups, -1);
+
+  std::vector<int> grouped_occupancy_counts(params.n_days * def_n_compartment_groups, 0);
+  std::vector<int> grouped_transitions(params.n_days * def_n_compartment_groups, 0);
   
   for(int c = 0; c < def_n_compartments; c++) {
     
     int c_grp = group_compartment(c);
     for(int day = 0; day < params.n_days; day++) {
       int n_occupancy = arr[ix(day * params.steps_per_day, c, s_occupancy)];
+      int n_transitions = arr[ix(day * params.steps_per_day, c, s_transitions)];
       
       
-      grouped_occupancy_counts[c_grp * params.n_days + day] += n_occupancy;
       grouped_occupancy_compartment_labels[c_grp * params.n_days + day] = c_grp;
+      grouped_occupancy_counts[c_grp * params.n_days + day] += n_occupancy;
+      grouped_transitions[c_grp * params.n_days + day] += n_transitions;
     }
   }
   
   mush_results results;
   
-  results.grouped_occupancy_counts = grouped_occupancy_counts;
   results.grouped_occupancy_compartment_labels = grouped_occupancy_compartment_labels;
-  
+  results.grouped_occupancy_counts = grouped_occupancy_counts;
+  results.grouped_transitions = grouped_transitions;
   
   return results;
 }
