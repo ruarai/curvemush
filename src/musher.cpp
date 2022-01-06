@@ -9,6 +9,8 @@
 #define s_occupancy 0
 #define s_transitions 1
 
+// This ends up being shared across threads - but believe it won't cause issues
+// Data race in this context doesn't really matter
 static int g_seed = 0;
 
 // Fast random number generator for picking samples
@@ -123,7 +125,7 @@ mush_results musher::mush_curve(
       c_postICU_to_discharge, c_discharged_postICU,
       arr[ix(t, c_postICU_to_discharge, s_transitions)],
       t, arr, ix,
-      ICU_to_discharge_delays,
+      postICU_to_discharge_delays,
       n_steps
     );
     
@@ -132,10 +134,12 @@ mush_results musher::mush_curve(
       c_postICU_to_death, c_died_postICU,
       arr[ix(t, c_postICU_to_death, s_transitions)],
       t, arr, ix,
-      ICU_to_discharge_delays,
+      postICU_to_death_delays,
       n_steps
     );
   }
+
+  // Pulling together grouped compartment counts for the results
   
   std::vector<int> grouped_occupancy_compartment_labels(params.n_days * def_n_compartment_groups, -1);
 
@@ -146,8 +150,14 @@ mush_results musher::mush_curve(
     
     int c_grp = group_compartment(c);
     for(int day = 0; day < params.n_days; day++) {
+      // Sample occupancy counts from the steps_per_dayth slot
       int n_occupancy = arr[ix(day * params.steps_per_day, c, s_occupancy)];
-      int n_transitions = arr[ix(day * params.steps_per_day, c, s_transitions)];
+
+      // But sum transitions across each slot within a day
+      int n_transitions = 0;
+      for(int i = 0; i < params.steps_per_day; i++) 
+        n_transitions += arr[ix(day * params.steps_per_day + i, c, s_transitions)];
+      
       
       
       grouped_occupancy_compartment_labels[c_grp * params.n_days + day] = c_grp;
