@@ -36,19 +36,19 @@ DataFrame mush(
   params.n_delay_samples = n_delay_samples;
 
 
-  std::vector<group_data> g_datas(def_n_groups);
+  std::vector<group_data> g_datas(def_n_strats);
 
-  for(int g = 0; g < def_n_groups; g++) 
+  for(int g = 0; g < def_n_strats; g++) 
     g_datas[g] = group_data::read_group_data(forecasting_parameters, g);
 
-  NumericVector pr_age_given_case(def_n_groups);
-  for(int g = 0; g < def_n_groups; g++) 
+  NumericVector pr_age_given_case(def_n_strats);
+  for(int g = 0; g < def_n_strats; g++) 
     pr_age_given_case[g] = g_datas[g].pr_age_given_case;
   
 
   // Define and initialize our hospitalisation curves
-  std::vector<std::vector<std::vector<int>>> hosp_curves(def_n_groups);
-  for(int g = 0; g < def_n_groups; g++) {
+  std::vector<std::vector<std::vector<int>>> hosp_curves(def_n_strats);
+  for(int g = 0; g < def_n_strats; g++) {
     hosp_curves[g] = std::vector<std::vector<int>>(n_samples);
     for(int i = 0; i < n_samples; i++)
       hosp_curves[g][i] = std::vector<int>(n_days, 0);
@@ -63,20 +63,20 @@ DataFrame mush(
     
     
     // Over the backcast period, cases are split by age group (and known precisely)
-    for(int g = 0; g < def_n_groups; g++)
+    for(int g = 0; g < def_n_strats; g++)
       for(int d = 0; d < t_forecast_start; d++)
-        hosp_curves[g][i][d] = curve_i[d * def_n_groups + g];
+        hosp_curves[g][i][d] = curve_i[d * def_n_strats + g];
     
     // But in the forecast period, we perform the age sampling ourselves
     for(int d = 0; d < n_days - t_forecast_start; d++) {
-      int n_cases = curve_i[t_forecast_start * def_n_groups + d];
+      int n_cases = curve_i[t_forecast_start * def_n_strats + d];
 
       if(n_cases == 0)
         continue;
 
       IntegerVector age_samples = rmultinom_vec(n_cases, pr_age_given_case);
 
-      for(int g = 0; g < def_n_groups; g++) {
+      for(int g = 0; g < def_n_strats; g++) {
         int n_cases_group = age_samples[g];
 
         int n_hospitalised = R::rbinom(n_cases_group, g_datas[g].pr_hosp);
@@ -86,9 +86,9 @@ DataFrame mush(
     }
   }
 
-  std::vector<std::vector<mush_results>> results(def_n_groups);
+  std::vector<std::vector<mush_results>> results(def_n_strats);
   
-  for(int g = 0; g < def_n_groups; g++) {
+  for(int g = 0; g < def_n_strats; g++) {
 
     group_data g_data = g_datas[g];
 
@@ -125,7 +125,7 @@ DataFrame mush(
 
       compartment_group_count[ix] = 0;
       compartment_group_transitions[ix] = 0;
-      for(int g = 0; g < def_n_groups; g++) {
+      for(int g = 0; g < def_n_strats; g++) {
         compartment_group_count[ix] += results[g][i].grouped_occupancy_counts[x];
         compartment_group_transitions[ix] += results[g][i].grouped_transitions[x];
       }

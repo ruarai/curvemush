@@ -2,7 +2,7 @@
 
 #pragma once
 
-#define def_n_groups 9
+#define def_n_strats 9
 
 #define def_n_compartments 11
 
