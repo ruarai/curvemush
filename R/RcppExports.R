@@ -5,7 +5,3 @@ mush_abc <- function(n_samples, n_delay_samples, n_outputs, n_days, steps_per_da
     .Call(`_curvemush_mush_abc`, n_samples, n_delay_samples, n_outputs, n_days, steps_per_day, t_forecast_start, ward_threshold, ICU_threshold, ensemble_curves, mat_pr_age_given_case, mat_pr_hosp, mat_pr_ICU, forecasting_parameters, known_ward_vec, known_ICU_vec, prior_sigma_los, prior_sigma_hosp)
 }
 
-mush <- function(n_samples, n_delay_samples, n_days, steps_per_day, t_forecast_start, ensemble_curves, forecasting_parameters, scale_los) {
-    .Call(`_curvemush_mush`, n_samples, n_delay_samples, n_days, steps_per_day, t_forecast_start, ensemble_curves, forecasting_parameters, scale_los)
-}
-

@@ -8,3 +8,5 @@ src/*.dll
 .debug
 proto_data
 Rplots.pdf
+R/RcppExports.R
+src/RcppExports.cpp
