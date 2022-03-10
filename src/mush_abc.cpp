@@ -89,9 +89,18 @@ List mush_abc(
             if (n_cases == 0)
                 continue;
 
+            bool all_zero_pr = true;
+
             NumericVector pr_age_given_case(def_n_strats);
-            for(int s = 0; s < def_n_strats; s++)
+            for(int s = 0; s < def_n_strats; s++) {
                 pr_age_given_case[s] = mat_pr_age_given_case(d * def_n_strats + s, i % mat_pr_age_given_case.ncol());
+
+                if(pr_age_given_case[s] > 0)
+                    all_zero_pr = false;
+            }
+
+            if(all_zero_pr)
+                continue;
 
             // Produce a vector distributing the n_cases across each age stratification
             // according to pr_age_given_case
@@ -125,11 +134,12 @@ List mush_abc(
     std::vector<std::vector<mush_results>> results(n_outputs);
     std::vector<int> prior_chosen(n_outputs);
         
+    int n_rejected =0;
 
     RcppThread::parallelFor(
         0, n_outputs,
         [&results, params, &case_curves, strat_datas, n_strat_samples, known_ward, known_ICU, n_samples, t_forecast_start,
-         ward_threshold, ICU_threshold, &los_scale_samples, &pr_hosp_scale_samples, &prior_chosen,
+         ward_threshold, ICU_threshold, &los_scale_samples, &pr_hosp_scale_samples, &prior_chosen, &n_rejected,
          &pr_hosp_curves, &pr_ICU_curves](unsigned int i)
         {
             bool rejected = true;
@@ -210,6 +220,8 @@ List mush_abc(
                 if(!rejected) {
                     results[i] = sample_results;
                     prior_chosen[i] = i_prior;
+                } else{
+                    n_rejected++;
                 }
             }
         }
@@ -302,9 +314,10 @@ List mush_abc(
         _["pr_hosp_scale"] = grped_sample_pr_hosp_scale
     );
 
-    List R_list_results = List::create(
+    return List::create(
         _["results"] = R_results,
-        _["grouped_results"] = R_grped_results);
+        _["grouped_results"] = R_grped_results,
 
-    return R_list_results;
+        _["n_rejected"] = n_rejected
+    );
 }
