@@ -3,7 +3,7 @@
 
 using namespace Rcpp;
 
-struct group_data {
+struct strat_data {
   float pr_age_given_case;
   float pr_hosp;
 
@@ -33,5 +33,5 @@ struct group_data {
   float d_shape_postICU_to_death, d_scale_postICU_to_death;
 
 
-  static group_data read_group_data(DataFrame forecasting_parameters, int group_ix);
+  static strat_data read_strat_data(DataFrame forecasting_parameters, int group_ix);
 };

@@ -7,17 +7,33 @@ load(".debug")
 
 
 a <- Sys.time()
-results <- mush(
-  n_samples = n_samples,
-  n_delay_samples = n_delay_samples,
+results <- curvemush::mush_abc(
+  n_samples = 400,
+  n_delay_samples = 512,
   
-  n_days = n_days,
-  steps_per_day = steps_per_day,
+  n_outputs = 100,
   
-  t_forecast_start = as.numeric(forecast_start_date - sim_start),
+  n_days = case_trajectories$n_days,
+  steps_per_day = 16,
   
-  ensemble_curves = input_curves
+  ward_threshold = 1000,
+  
+  prior_sigma_los = prior_sigma_los,
+  prior_sigma_hosp = prior_sigma_hosp,
+  
+  t_forecast_start = case_trajectories$step_sampling_start,
+  
+  ensemble_curves = case_curves,
+  
+  forecasting_parameters = forecasting_parameters,
+  
+  known_ward_vec = occupancy_curve_match$count_vec,
+  
+  mat_pr_age_given_case = mat_pr_age_given_case,
+  mat_pr_hosp = mat_pr_hosp,
+  mat_pr_ICU = mat_pr_ICU
 )
 b <- Sys.time()
 
-print(b - a)
+
+print(b-a)

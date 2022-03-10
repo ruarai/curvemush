@@ -2,15 +2,19 @@
 #pragma once
 #include "mush_params.h"
 #include "mush_compartments.h"
-#include "group_data.h"
+#include "strat_data.h"
 #include <random>
 
 
 struct mush_results {
   std::vector<int> grouped_occupancy_compartment_labels;
-  
   std::vector<int> grouped_occupancy_counts;
   std::vector<int> grouped_transitions;
+
+  
+  std::vector<int> occupancy_compartment_labels;
+  std::vector<int> occupancy_counts;
+  std::vector<int> transitions;
 };
 
 class musher {
@@ -20,7 +24,11 @@ public:
       
       std::vector<int> case_curve,
 
-      group_data g_data
+      strat_data g_data,
+
+      float scale_los,
+
+      std::vector<float> pr_ICU_curve
   );
   
   template <typename F>
