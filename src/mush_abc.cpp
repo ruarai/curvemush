@@ -25,8 +25,9 @@ List mush_abc(
 
     int t_forecast_start,
 
-    int ward_threshold,
-    int ICU_threshold,
+    NumericVector thresholds_vec,
+    int rejections_per_selections,
+    bool do_ABC,
 
     NumericMatrix ensemble_curves,
 
@@ -56,17 +57,11 @@ List mush_abc(
 
 
     // Define and initialize our hospitalisation curves (vector of vectors of vectors)
-    std::vector<std::vector<std::vector<int>>> case_curves(
-        def_n_strats,
-        std::vector<std::vector<int>>(n_samples, std::vector<int>(n_days, 0)));
+    std::vector<std::vector<std::vector<int>>> case_curves(def_n_strats, std::vector<std::vector<int>>(n_samples, std::vector<int>(n_days, 0)));
 
-    std::vector<std::vector<std::vector<float>>> pr_hosp_curves(
-        def_n_strats,
-    std::vector<std::vector<float>>(n_samples, std::vector<float>(n_days, -1)));
-
-    std::vector<std::vector<std::vector<float>>> pr_ICU_curves(
-        def_n_strats,
-        std::vector<std::vector<float>>(n_samples, std::vector<float>(n_days, -1)));
+    // pr_hosp and pr_ICU bootstrap curves (to be filled from mat_pr_hosp and mat_pr_ICU)
+    std::vector<std::vector<std::vector<float>>> pr_hosp_curves(def_n_strats, std::vector<std::vector<float>>(n_samples, std::vector<float>(n_days, -1)));
+    std::vector<std::vector<std::vector<float>>> pr_ICU_curves(def_n_strats, std::vector<std::vector<float>>(n_samples, std::vector<float>(n_days, -1)));
 
     int n_curves = ensemble_curves.ncol();
     // Producing n_samples case/hospitalisation trajectories to feed into the model:
@@ -95,10 +90,11 @@ List mush_abc(
             for(int s = 0; s < def_n_strats; s++) {
                 pr_age_given_case[s] = mat_pr_age_given_case(d * def_n_strats + s, i % mat_pr_age_given_case.ncol());
 
-                if(pr_age_given_case[s] > 0)
+                if(pr_age_given_case[s] > 0.0001)
                     all_zero_pr = false;
             }
 
+            // There's no probability of cases by any age, skip
             if(all_zero_pr)
                 continue;
 
@@ -134,98 +130,118 @@ List mush_abc(
     std::vector<std::vector<mush_results>> results(n_outputs);
     std::vector<int> prior_chosen(n_outputs);
         
-    int n_rejected =0;
+    std::vector<float> thresholds = as<std::vector<float>>(thresholds_vec);
+    std::vector<int> n_rejected(thresholds.size(), 0);
+    std::vector<int> n_accepted(thresholds.size(), 0);
+    int max_rejections = n_outputs * rejections_per_selections;
 
-    RcppThread::parallelFor(
-        0, n_outputs,
-        [&results, params, &case_curves, strat_datas, n_strat_samples, known_ward, known_ICU, n_samples, t_forecast_start,
-         ward_threshold, ICU_threshold, &los_scale_samples, &pr_hosp_scale_samples, &prior_chosen, &n_rejected,
-         &pr_hosp_curves, &pr_ICU_curves](unsigned int i)
-        {
-            bool rejected = true;
-            std::random_device rd;  
-            std::mt19937 rng(rd()); 
-            std::uniform_int_distribution<int> uni(0, n_samples - 1); 
+    for(int i_threshold = 0; i_threshold < thresholds.size(); i_threshold++) {
+        
 
-            while(rejected) {
 
-                std::vector<mush_results> sample_results(def_n_strats);
+        RcppThread::parallelFor(
+            0, n_outputs,
+            [&results, params, &case_curves, strat_datas, n_strat_samples, known_ward, known_ICU, n_samples, t_forecast_start,
+            &los_scale_samples, &pr_hosp_scale_samples, &prior_chosen, &n_rejected, &n_accepted, thresholds, i_threshold, max_rejections, do_ABC,
+            &pr_hosp_curves, &pr_ICU_curves](unsigned int i)
+            {
 
-                int i_prior = uni(rng);
+                bool rejected = true;
+                std::random_device rd;  
+                std::mt19937 rng(rd()); 
+                std::uniform_int_distribution<int> uni(0, n_samples - 1); 
+
+                while(rejected) {
+                    if(n_rejected[i_threshold] >= max_rejections)
+                        return;
+
+                    std::vector<mush_results> sample_results(def_n_strats);
+
+                    int i_prior = uni(rng);
+
+                            
+                    for (int s = 0; s < def_n_strats; s++)
+                    {
+                        strat_data s_data = strat_datas[i_prior % n_strat_samples + s];
+
+
+                        std::vector<int> case_curve_i = case_curves[s][i_prior];
+
+                        for (int d = 0; d < params.n_days - t_forecast_start; d++)
+                        {
+                            int n_cases = case_curve_i[t_forecast_start + d];
+
+                            if (n_cases == 0)
+                                continue;
+
+                            float pr_hosp = pr_hosp_curves[s][i_prior][d];
+
+                            float adj_pr_hosp = ilogit(logit(pr_hosp) + pr_hosp_scale_samples[i_prior]);
+                                
+                            std::binomial_distribution<int> hosp_binom(n_cases, adj_pr_hosp);
+
+                            case_curve_i[t_forecast_start + d] = hosp_binom(rng);
+                        }
+
 
                         
-                for (int s = 0; s < def_n_strats; s++)
-                {
-                    strat_data s_data = strat_datas[i_prior % n_strat_samples + s];
+                        sample_results[s] = musher::mush_curve(
+                            params,
+                            case_curve_i,
+                            s_data,
+                            los_scale_samples[i_prior],
+                            pr_ICU_curves[s][i_prior]
+                        );
+                    }
+                    
+                    std::vector<int> ward_counts(params.n_days, 0);
+                    std::vector<int> ICU_counts(params.n_days, 0);
 
+                    for(int s = 0; s < def_n_strats; s++) {
+                        for(int x = 0; x < params.n_days * def_n_compartment_groups; x++) {
 
-                    std::vector<int> case_curve_i = case_curves[s][i_prior];
-
-                    for (int d = 0; d < params.n_days - t_forecast_start; d++)
-                    {
-                        int n_cases = case_curve_i[t_forecast_start + d];
-
-                        if (n_cases == 0)
-                            continue;
-
-                        float pr_hosp = pr_hosp_curves[s][i_prior][d];
-
-                        float effect_adj = 1 - std::min(t_forecast_start - d, 60) / 60;
-
-                        float adj_pr_hosp = ilogit(logit(pr_hosp) + pr_hosp_scale_samples[i_prior] * effect_adj);
-                            
-                        std::binomial_distribution<int> hosp_binom(n_cases, adj_pr_hosp);
-
-                        case_curve_i[t_forecast_start + d] = hosp_binom(rng);
+                            if(sample_results[s].grouped_occupancy_compartment_labels[x] == cgrp_ward) {
+                                ward_counts[x % params.n_days] += sample_results[s].grouped_occupancy_counts[x];
+                            } else if(sample_results[s].grouped_occupancy_compartment_labels[x] == cgrp_ICU) {
+                                ICU_counts[x % params.n_days] += sample_results[s].grouped_occupancy_counts[x];
+                            }
+                        }
+                        
                     }
 
-
                     
-                    sample_results[s] = musher::mush_curve(
-                        params,
-                        case_curve_i,
-                        s_data,
-                        los_scale_samples[i_prior],
-                        pr_ICU_curves[s][i_prior]
-                    );
-                }
-                
-                std::vector<int> ward_counts(params.n_days, 0);
-                std::vector<int> ICU_counts(params.n_days, 0);
+                    rejected = false;
 
-                for(int s = 0; s < def_n_strats; s++) {
-                    for(int x = 0; x < params.n_days * def_n_compartment_groups; x++) {
-
-                        if(sample_results[s].grouped_occupancy_compartment_labels[x] == cgrp_ward) {
-                            ward_counts[x % params.n_days] += sample_results[s].grouped_occupancy_counts[x];
-                        } else if(sample_results[s].grouped_occupancy_compartment_labels[x] == cgrp_ICU) {
-                            ICU_counts[x % params.n_days] += sample_results[s].grouped_occupancy_counts[x];
+                    for(int t = 0; t < params.n_days; t++) {
+                        if(known_ward[t] != -1 && 
+                            std::abs(ward_counts[t] - known_ward[t]) > std::max(known_ward[t] * thresholds[i_threshold], 10.0f)) {
+                            rejected = true;
+                        }
+                        if(known_ICU[t] != -1 && 
+                            std::abs(ICU_counts[t] - known_ICU[t]) > std::max(known_ICU[t] * thresholds[i_threshold] * 2, 10.0f)) {
+                            rejected = true;
                         }
                     }
-                    
-                }
 
-                
-                rejected = false;
+                    if(!rejected || !do_ABC) {
+                        results[i] = sample_results;
+                        prior_chosen[i] = i_prior;
+                        n_accepted[i_threshold]++;
 
-                for(int t = 0; t < params.n_days; t++) {
-                    if(known_ward[t] != -1 && std::abs(ward_counts[t] - known_ward[t]) > ward_threshold) {
-                        rejected = true;
+                        rejected = false;
+                    } else{
+                        n_rejected[i_threshold]++;
                     }
-                    if(known_ICU[t] != -1 && std::abs(ICU_counts[t] - known_ICU[t]) > ICU_threshold) {
-                        rejected = true;
-                    }
-                }
-
-                if(!rejected) {
-                    results[i] = sample_results;
-                    prior_chosen[i] = i_prior;
-                } else{
-                    n_rejected++;
                 }
             }
-        }
-    );
+        );
+
+        if(n_rejected[i_threshold] < max_rejections || !do_ABC)
+            break;
+    }
+
+
+
 
     int result_size = params.n_days * def_n_compartments;
     int n_results = n_outputs * result_size;
@@ -318,6 +334,7 @@ List mush_abc(
         _["results"] = R_results,
         _["grouped_results"] = R_grped_results,
 
-        _["n_rejected"] = n_rejected
+        _["n_rejected"] = n_rejected,
+        _["n_accepted"] = n_accepted
     );
 }
