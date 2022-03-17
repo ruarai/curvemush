@@ -8,10 +8,10 @@
 #include "mush_params.h"
 #include "rmultinom_vec.h"
 
+#include "hosp_sampling.h"
+
 using namespace Rcpp;
 
-float logit(float x) { return std::log(x / (1 - x)); }
-float ilogit(float x) { return std::exp(x) / (std::exp(x) + 1);}
 
 // [[Rcpp::export]]
 List mush_abc(
@@ -22,8 +22,6 @@ List mush_abc(
 
     int n_days,
     int steps_per_day,
-
-    int t_forecast_start,
 
     NumericVector thresholds_vec,
     int rejections_per_selections,
@@ -41,8 +39,8 @@ List mush_abc(
     IntegerVector known_ICU_vec,
     
     double prior_sigma_los,
-    double prior_sigma_hosp)
-{
+    double prior_sigma_hosp
+) {
     mush_params params;
     params.n_days = n_days;
     params.steps_per_day = steps_per_day;
@@ -71,15 +69,10 @@ List mush_abc(
         // Looping (by % n_curves) if we are performing more samples than we have ensembles
         NumericVector curve_i = ensemble_curves(_, i % n_curves);
 
-        // Over the backcast period, cases are split by age group (and known precisely)
-        for (int s = 0; s < def_n_strats; s++)
-            for (int d = 0; d < t_forecast_start; d++)
-                case_curves[s][i][d] = curve_i[d * def_n_strats + s];
-
-        // But in the forecast period, we perform the age sampling ourselves
-        for (int d = 0; d < n_days - t_forecast_start; d++)
+        // Perform the age sampling ourselves
+        for (int d = 0; d < n_days; d++)
         {
-            int n_cases = curve_i[t_forecast_start * def_n_strats + d];
+            int n_cases = curve_i[d];
 
             if (n_cases == 0)
                 continue;
@@ -94,7 +87,7 @@ List mush_abc(
                     all_zero_pr = false;
             }
 
-            // There's no probability of cases by any age, skip
+            // There's no probability of cases by any age, skip (otherwise the multinomial sampling will be unhappy)
             if(all_zero_pr)
                 continue;
 
@@ -103,7 +96,7 @@ List mush_abc(
             IntegerVector age_samples = rmultinom_vec(n_cases, pr_age_given_case);
 
             for (int s = 0; s < def_n_strats; s++)
-                case_curves[s][i][t_forecast_start + d] = age_samples[s];
+                case_curves[s][i][d] = age_samples[s];
 
             
         }
@@ -135,59 +128,51 @@ List mush_abc(
     std::vector<int> n_accepted(thresholds.size(), 0);
     int max_rejections = n_outputs * rejections_per_selections;
 
+    // Iterate over the thresholds in thresholds_vec
     for(int i_threshold = 0; i_threshold < thresholds.size(); i_threshold++) {
         
 
-
+        // For each threshold, try and produce 'n_outputs' results, with rejection of trajectories
+        // that do not match true ICU or ward occupancy counts +- the threshold (proportionally)
         RcppThread::parallelFor(
             0, n_outputs,
-            [&results, params, &case_curves, strat_datas, n_strat_samples, known_ward, known_ICU, n_samples, t_forecast_start,
-            &los_scale_samples, &pr_hosp_scale_samples, &prior_chosen, &n_rejected, &n_accepted, thresholds, i_threshold, max_rejections, do_ABC,
-            &pr_hosp_curves, &pr_ICU_curves](unsigned int i)
+            [&results, params, &case_curves, strat_datas, n_strat_samples, known_ward, known_ICU, n_samples,
+            &los_scale_samples, &pr_hosp_scale_samples, &prior_chosen, &n_rejected, &n_accepted, thresholds,
+             i_threshold, max_rejections, do_ABC, &pr_hosp_curves, &pr_ICU_curves](unsigned int i)
             {
 
                 bool rejected = true;
                 std::random_device rd;  
                 std::mt19937 rng(rd()); 
-                std::uniform_int_distribution<int> uni(0, n_samples - 1); 
+                std::uniform_int_distribution<int> uni(0, n_samples - 1);
 
+                // This will repeat until a good trajectory (and corresponding prior) is found
+                // If this process -- across all threads -- fails max_rejections times, we will move to the next bigger threshold
                 while(rejected) {
                     if(n_rejected[i_threshold] >= max_rejections)
                         return;
 
                     std::vector<mush_results> sample_results(def_n_strats);
-
                     int i_prior = uni(rng);
 
-                            
                     for (int s = 0; s < def_n_strats; s++)
                     {
                         strat_data s_data = strat_datas[i_prior % n_strat_samples + s];
 
 
-                        std::vector<int> case_curve_i = case_curves[s][i_prior];
+                        std::vector<int> hospitalised_cases = sample_hospitalised_cases(
+                            case_curves[s][i_prior],
+                            pr_hosp_curves[s][i_prior],
 
-                        for (int d = 0; d < params.n_days - t_forecast_start; d++)
-                        {
-                            int n_cases = case_curve_i[t_forecast_start + d];
+                            pr_hosp_scale_samples[i_prior],
 
-                            if (n_cases == 0)
-                                continue;
-
-                            float pr_hosp = pr_hosp_curves[s][i_prior][d];
-
-                            float adj_pr_hosp = ilogit(logit(pr_hosp) + pr_hosp_scale_samples[i_prior]);
-                                
-                            std::binomial_distribution<int> hosp_binom(n_cases, adj_pr_hosp);
-
-                            case_curve_i[t_forecast_start + d] = hosp_binom(rng);
-                        }
-
+                            rng
+                        );
 
                         
                         sample_results[s] = musher::mush_curve(
                             params,
-                            case_curve_i,
+                            hospitalised_cases,
                             s_data,
                             los_scale_samples[i_prior],
                             pr_ICU_curves[s][i_prior]
@@ -251,7 +236,6 @@ List mush_abc(
     NumericVector compartment_label(n_results);
     NumericVector compartment_count(n_results);
     NumericVector compartment_transitions(n_results);
-    NumericVector sample_los_scale(n_results);
 
     for (int i = 0; i < n_outputs; i++)
     {
@@ -260,7 +244,6 @@ List mush_abc(
             int ix = i * result_size + x;
 
             sample_label[ix] = i;
-            sample_los_scale[ix] = los_scale_samples[i];
 
             t_day[ix] = x % params.n_days;
             compartment_label[ix] = results[i][0].occupancy_compartment_labels[x];
@@ -280,8 +263,7 @@ List mush_abc(
         _["t_day"] = t_day,
         _["compartment"] = compartment_label,
         _["count"] = compartment_count,
-        _["transitions"] = compartment_transitions,
-        _["los_scale"] = sample_los_scale
+        _["transitions"] = compartment_transitions
     );
 
     // Build out our result dataframe to return
@@ -293,8 +275,7 @@ List mush_abc(
     NumericVector grped_compartment_group_label(grped_n_results);
     NumericVector grped_compartment_group_count(grped_n_results);
     NumericVector grped_compartment_group_transitions(grped_n_results);
-    NumericVector grped_sample_los_scale(grped_n_results);
-    NumericVector grped_sample_pr_hosp_scale(grped_n_results);
+
 
 
     for (int i = 0; i < n_outputs; i++)
@@ -306,9 +287,6 @@ List mush_abc(
             grped_sample_label[ix] = i;
             grped_t_day[ix] = x % params.n_days;
             grped_compartment_group_label[ix] = results[i][0].grouped_occupancy_compartment_labels[x];
-            
-            grped_sample_los_scale[ix] = los_scale_samples[prior_chosen[i]];
-            grped_sample_pr_hosp_scale[ix] = pr_hosp_scale_samples[prior_chosen[i]];
 
             grped_compartment_group_count[ix] = 0;
             grped_compartment_group_transitions[ix] = 0;
@@ -325,9 +303,7 @@ List mush_abc(
         _["t_day"] = grped_t_day,
         _["compartment_group"] = grped_compartment_group_label,
         _["count"] = grped_compartment_group_count,
-        _["transitions"] = grped_compartment_group_transitions,
-        _["los_scale"] = grped_sample_los_scale,
-        _["pr_hosp_scale"] = grped_sample_pr_hosp_scale
+        _["transitions"] = grped_compartment_group_transitions
     );
 
     return List::create(
@@ -335,6 +311,10 @@ List mush_abc(
         _["grouped_results"] = R_grped_results,
 
         _["n_rejected"] = n_rejected,
-        _["n_accepted"] = n_accepted
+        _["n_accepted"] = n_accepted,
+
+        _["prior_chosen"] = prior_chosen,
+        _["prior_los_scale"] = los_scale_samples,
+        _["prior_pr_hosp"] = pr_hosp_scale_samples
     );
 }
