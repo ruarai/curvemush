@@ -48,7 +48,7 @@ mush_results musher::mush_curve(
   std::vector<int> arr(n_array, 0);
   
   for(int d = 0; d < case_curve.size(); d++) {
-    arr[ix(d * params.steps_per_day, c_symptomatic, s_occupancy)] = case_curve[d];
+    //arr[ix(d * params.steps_per_day, c_symptomatic, s_occupancy)] = case_curve[d];
     arr[ix(d * params.steps_per_day, c_symptomatic, s_transitions)] = case_curve[d];
   }
   
@@ -111,12 +111,16 @@ mush_results musher::mush_curve(
   // We utilise the arr[] array in such a way to maximise memory locality
 
   for(int t = 0; t < n_steps; t++) {
-    // Update the current occupancy value to reflect the value at the last timestep
-    // counted at arr[ix(t - 1, c, s_occupancy)]
-    // plus/minus any transitions (counted by arr[ix(t, c, s_occupancy)])
     for(int c = 0; c < def_n_compartments; c++) {
+      
+      // Update the current occupancy value to reflect the value at the last timestep
+      // counted at arr[ix(t - 1, c, s_occupancy)]
+      // plus/minus any transitions (counted by arr[ix(t, c, s_occupancy)])
       if(t > 0)
         arr[ix(t, c, s_occupancy)] = arr[ix(t, c, s_occupancy)] + arr[ix(t - 1, c, s_occupancy)];
+
+      // Also increment occupancy by number of inwards transitions
+      arr[ix(t, c, s_occupancy)] = arr[ix(t, c, s_occupancy)] + arr[ix(t, c, s_transitions)];
     }
     
     
@@ -377,9 +381,6 @@ void musher::transition_generic_delayed(
     
     // We need to handle this transition in the future
     arr[ix(t_set, c_to, s_transitions)]++;
-    
-    // Indicate that occupancy in the future for our new compartment increases
-    arr[ix(t_set, c_to, s_occupancy)]++; 
     
     // Indicate that occupancy in the future for our current compartment decreases
     arr[ix(t_set, c_from, s_occupancy)]--;
