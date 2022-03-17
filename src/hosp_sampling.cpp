@@ -14,7 +14,7 @@ std::vector<int> sample_hospitalised_cases(
 ) {
     int n_days = daily_cases.size();
 
-    std::vector<int> daily_hospitalised(n_days, -1);
+    std::vector<int> daily_hospitalised(n_days, 0);
 
     for (int d = 0; d < n_days; d++)
     {
