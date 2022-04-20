@@ -1,5 +1,6 @@
 
-#include <Rcpp.h>
+#pragma once
+#include <RcppArmadillo.h>
 
 using namespace Rcpp;
 

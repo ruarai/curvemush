@@ -12,8 +12,9 @@
 
 using namespace Rcpp;
 
+
 // [[Rcpp::export]]
-List mush_abc(
+List mush_abc_spline(
     int n_samples,
     int n_delay_samples,
 
@@ -36,9 +37,11 @@ List mush_abc(
     
     IntegerVector known_ward_vec,
     IntegerVector known_ICU_vec,
-    
-    double prior_sigma_los,
-    double prior_sigma_hosp
+
+    int day_start_fit,
+    int day_end_fit,
+
+    arma::mat spline_basis
 ) {
     mush_params params;
     params.n_days = n_days;
@@ -108,16 +111,9 @@ List mush_abc(
         }
     }
 
-    std::vector<float> los_scale_samples(n_samples);
-    std::vector<float> pr_hosp_scale_samples(n_samples);
     std::vector<int> known_ward = as<std::vector<int>>(known_ward_vec);
     std::vector<int> known_ICU = as<std::vector<int>>(known_ICU_vec);
 
-    for (int i = 0; i < los_scale_samples.size(); i++)
-        los_scale_samples[i] = R::rnorm(0, prior_sigma_los);
-        
-    for (int i = 0; i < pr_hosp_scale_samples.size(); i++)
-        pr_hosp_scale_samples[i] = R::rnorm(0, prior_sigma_hosp);
 
     std::vector<std::vector<mush_results>> results(n_outputs);
     std::vector<int> prior_chosen(n_outputs);
@@ -126,6 +122,8 @@ List mush_abc(
     std::vector<int> n_rejected(thresholds.size(), 0);
     std::vector<int> n_accepted(thresholds.size(), 0);
     int max_rejections = n_outputs * rejections_per_selections;
+
+    std::vector<arma::vec> splines_chosen(n_outputs);
 
     // Iterate over the thresholds in thresholds_vec
     for(int i_threshold = 0; i_threshold < thresholds.size(); i_threshold++) {
@@ -136,14 +134,16 @@ List mush_abc(
         RcppThread::parallelFor(
             0, n_outputs,
             [&results, params, &case_curves, strat_datas, n_strat_samples, known_ward, known_ICU, n_samples,
-            &los_scale_samples, &pr_hosp_scale_samples, &prior_chosen, &n_rejected, &n_accepted, thresholds,
-             i_threshold, max_rejections, do_ABC, &pr_hosp_curves, &pr_ICU_curves](unsigned int i)
+             &prior_chosen, &n_rejected, &n_accepted, thresholds,
+             i_threshold, max_rejections, do_ABC, &pr_hosp_curves, &pr_ICU_curves,
+             spline_basis, day_start_fit, day_end_fit, &splines_chosen](unsigned int i)
             {
 
                 bool rejected = true;
                 std::random_device rd;  
                 std::mt19937 rng(rd()); 
                 std::uniform_int_distribution<int> uni(0, n_samples - 1);
+                std::normal_distribution<float> rweights(0, 1); 
 
                 // This will repeat until a good trajectory (and corresponding prior) is found
                 // If this process -- across all threads -- fails max_rejections times, we will move to the next bigger threshold
@@ -154,16 +154,27 @@ List mush_abc(
                     std::vector<mush_results> sample_results(def_n_strats);
                     int i_prior = uni(rng);
 
+                    arma::vec pr_hosp_spline_weights(spline_basis.n_cols, arma::fill::zeros);
+                    //arma::vec los_spline_weights(spline_basis.n_cols, arma::fill::zeros);
+                    for(int j = 0; j < spline_basis.n_cols; j++) {
+                        pr_hosp_spline_weights[j] = rweights(rng);
+                        //los_spline_weights[j] = rweights(rng);
+                    }
+
+                    arma::vec pr_hosp_offset = spline_basis * pr_hosp_spline_weights;
+                    //arma::vec los_offset = spline_basis * pr_hosp_spline_weights;
+
                     for (int s = 0; s < def_n_strats; s++)
                     {
                         strat_data s_data = strat_datas[i_prior % n_strat_samples + s];
 
 
-                        std::vector<int> hospitalised_cases = sample_hospitalised_cases(
+                        std::vector<int> hospitalised_cases = sample_hospitalised_cases_spline(
                             case_curves[s][i_prior],
                             pr_hosp_curves[s][i_prior],
 
-                            pr_hosp_scale_samples[i_prior],
+                            pr_hosp_offset,
+                            day_start_fit, day_end_fit,
 
                             rng
                         );
@@ -173,7 +184,7 @@ List mush_abc(
                             params,
                             hospitalised_cases,
                             s_data,
-                            los_scale_samples[i_prior],
+                            0,
                             pr_ICU_curves[s][i_prior]
                         );
                     }
@@ -190,26 +201,27 @@ List mush_abc(
                                 ICU_counts[x % params.n_days] += sample_results[s].grouped_occupancy_counts[x];
                             }
                         }
-                        
+
                     }
 
                     
                     rejected = false;
 
-                    for(int t = 0; t < params.n_days; t++) {
+                    for(int t = 0; t < params.n_days; t += 4) {
                         if(known_ward[t] != -1 && 
                             std::abs(ward_counts[t] - known_ward[t]) > std::max(known_ward[t] * thresholds[i_threshold], 10.0f)) {
                             rejected = true;
                         }
-                        if(known_ICU[t] != -1 && 
-                            std::abs(ICU_counts[t] - known_ICU[t]) > std::max(known_ICU[t] * thresholds[i_threshold] * 2, 10.0f)) {
-                            rejected = true;
-                        }
+                        // if(known_ICU[t] != -1 &&
+                        //     std::abs(ICU_counts[t] - known_ICU[t]) > std::max(known_ICU[t] * thresholds[i_threshold] * 2, 10.0f)) {
+                        //     rejected = true;
+                        // }
                     }
 
                     if(!rejected || !do_ABC) {
                         results[i] = sample_results;
                         prior_chosen[i] = i_prior;
+                        splines_chosen[i] = pr_hosp_offset;
                         n_accepted[i_threshold]++;
 
                         rejected = false;
@@ -313,7 +325,6 @@ List mush_abc(
         _["n_accepted"] = n_accepted,
 
         _["prior_chosen"] = prior_chosen,
-        _["prior_los_scale"] = los_scale_samples,
-        _["prior_pr_hosp"] = pr_hosp_scale_samples
+        _["splines_chosen"] = splines_chosen
     );
 }

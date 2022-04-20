@@ -12,7 +12,7 @@
       "args": [
         "--vanilla",
         "-e",
-        "source('simple_debug.R')"
+        "source('../clinical_forecasting/R/experiments/abc_test_null.R')"
       ],
       "stopAtEntry": false,
       "envFile": "${workspaceFolder}/.vscode/.env",

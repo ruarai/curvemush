@@ -1,5 +1,5 @@
 
-#include <Rcpp.h>
+#include <RcppArmadillo.h>
 using namespace Rcpp;
 
 // Helper functions to use rmultinom (multinomial sampling)

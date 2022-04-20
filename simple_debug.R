@@ -11,19 +11,17 @@ results <- curvemush::mush_abc(
   n_samples = 4000,
   n_delay_samples = 512,
   
-  n_outputs = 1000,
+  n_outputs = 10000,
   
   n_days = case_trajectories$n_days,
-  steps_per_day = 16,
+  steps_per_day = 4,
   
-  thresholds_vec = c(1000),
-  rejections_per_selections = 1,
+  thresholds_vec = thresholds,
+  rejections_per_selections = 100,
   do_ABC = TRUE,
   
   prior_sigma_los = 0,
   prior_sigma_hosp = 0,
-  
-  t_forecast_start = case_trajectories$step_sampling_start,
   
   ensemble_curves = case_curves,
   

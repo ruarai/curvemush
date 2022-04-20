@@ -6,6 +6,7 @@
                 "${workspaceFolder}/**",
                 "${env:HOME}/R/x86_64-pc-linux-gnu-library/4.1/Rcpp/include",
                 "${env:HOME}/R/x86_64-pc-linux-gnu-library/4.1/RcppThread/include",
+                "${env:HOME}/R/x86_64-pc-linux-gnu-library/4.1/RcppArmadillo/include",
                 "/usr/share/R/include"
             ],
             "defines": [],

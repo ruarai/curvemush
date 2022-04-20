@@ -1,5 +1,5 @@
 
-#include <Rcpp.h>
+#include <RcppArmadillo.h>
 #include <random>
 
 float logit(float x) { return std::log(x / (1 - x)); }
@@ -24,6 +24,68 @@ std::vector<int> sample_hospitalised_cases(
             continue;
 
         float adj_pr_hosp = ilogit(logit(pr_hosp[d]) + pr_hosp_scale);
+            
+        std::binomial_distribution<int> hosp_binom(n_cases, adj_pr_hosp);
+
+        daily_hospitalised[d] = hosp_binom(rng);
+    }
+
+    return daily_hospitalised;
+}
+
+std::vector<int> sample_hospitalised_cases_spline(
+    std::vector<int> &daily_cases,
+    std::vector<float> &pr_hosp,
+    arma::vec pr_hosp_scale,
+
+    int day_start_scale,
+    int day_end_scale,
+
+    std::mt19937 &rng
+) {
+    int n_days = daily_cases.size();
+
+    std::vector<int> daily_hospitalised(n_days, 0);
+
+    for (int d = 0; d < n_days; d++)
+    {
+        int n_cases = daily_cases[d];
+
+        if (n_cases == 0)
+            continue;
+
+        float adj_pr_hosp = ilogit(logit(pr_hosp[d]) + pr_hosp_scale(std::min(std::max(d, day_start_scale + 1), day_end_scale - 1)));
+            
+        std::binomial_distribution<int> hosp_binom(n_cases, adj_pr_hosp);
+
+        daily_hospitalised[d] = hosp_binom(rng);
+    }
+
+    return daily_hospitalised;
+}
+
+std::vector<int> sample_hospitalised_cases_spline_B(
+    const std::vector<int> &daily_cases,
+    const std::vector<float> &pr_hosp,
+    arma::vec pr_hosp_scale,
+
+    int day_start_scale,
+    int day_end_scale,
+
+    std::mt19937 &rng
+) {
+    int n_days = daily_cases.size();
+
+    std::vector<int> daily_hospitalised(n_days, 0);
+
+    for (int d = 0; d < n_days; d++)
+    {
+        int n_cases = daily_cases[d];
+
+        if (n_cases == 0)
+            continue;
+
+        float adj_pr_hosp = ilogit(logit(pr_hosp[d]) + pr_hosp_scale(std::min(std::max(d, day_start_scale + 1), day_end_scale - 1)));
             
         std::binomial_distribution<int> hosp_binom(n_cases, adj_pr_hosp);
 
