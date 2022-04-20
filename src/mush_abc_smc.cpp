@@ -211,8 +211,8 @@ List mush_abc_smc(
         _["grouped_results"] = R_grped_results,
 
         _["smc_weights"] = smc_out.weights,
-        _["smc_attempts"] = smc_out.attempts,
+        _["smc_attempts"] = smc_out.attempts//,
 
-        _["smc_spline_fits"] = smc_out.spline_fits
+        //_["smc_spline_fits"] = smc_out.spline_fits
     );
 }

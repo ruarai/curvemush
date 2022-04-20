@@ -168,12 +168,13 @@ List mush_abc(
                             rng
                         );
 
+                        std::vector<float> los_offset_curve(params.n_days, los_scale_samples[i_prior]);
                         
                         sample_results[s] = musher::mush_curve(
                             params,
                             hospitalised_cases,
                             s_data,
-                            los_scale_samples[i_prior],
+                            los_offset_curve,
                             pr_ICU_curves[s][i_prior]
                         );
                     }

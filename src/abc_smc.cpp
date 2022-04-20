@@ -27,8 +27,9 @@ smc_results abc_smc::process_abc_smc(
     int n_thresholds = input_data.thresholds.size();
 
     int df_spline = input_data.spline_basis.n_cols;
+    int df_2_splines = df_spline * 2;
 
-    std::vector<arma::mat> params(n_particles, arma::mat(df_spline, n_thresholds, arma::fill::zeros));
+    std::vector<arma::mat> params(n_particles, arma::mat(df_2_splines, n_thresholds, arma::fill::zeros));
 
     arma::mat weights(n_particles, n_thresholds);
     arma::mat attempts(n_particles, n_thresholds);
@@ -36,22 +37,21 @@ smc_results abc_smc::process_abc_smc(
     
     std::vector<std::vector<mush_results>> results(n_particles);
 
-    std::vector<arma::vec> pr_hosp_fits(n_particles);
-
-    double perturb_sigma = 0.05;
+    double perturb_sigma = 0.025;
 
     for(int t = 0; t < input_data.thresholds.size(); t++) {
 		Rcout << "t = " << t << ", (" << input_data.thresholds[t] << ")\n";
 
         RcppThread::parallelFor(0, n_particles,
         
-        [&params, &weights, &attempts, &results, &pr_hosp_fits, &input_data,
-         df_spline, perturb_sigma, n_particles, t] (unsigned int p) {
+        [&params, &weights, &attempts, &results, &input_data,
+         df_2_splines, perturb_sigma, n_particles, t] (unsigned int p) {
             std::random_device rd;
 			std::mt19937 gen(rd());
 
 			std::normal_distribution<> perturb_kernel(0, perturb_sigma);
 			std::normal_distribution<> prior(0, 1);
+			std::normal_distribution<> prior_los(-2, 1);
 
             std::uniform_int_distribution<int> param_sample_dist(0, input_data.n_parameter_samples - 1);
 
@@ -66,8 +66,10 @@ smc_results abc_smc::process_abc_smc(
             while(!fit_achieved) {
                 
 				if(t == 0) { // Sample from prior at t == 0
-					for (int i = 0; i < df_spline; i++)
+					for (int i = 0; i < 4; i++)
 						params[p](i, t) = prior(gen);
+					for (int i = 4; i < 8; i++)
+						params[p](i, t) = prior_los(gen);
 				}
 				else {
 					std::vector<double> prev_weights = arma::conv_to<stdvec>::from(weights.col(t - 1));
@@ -75,7 +77,7 @@ smc_results abc_smc::process_abc_smc(
 
 					int p_sample = sample_dist(gen);
 
-					for(int w = 0; w < df_spline; w++)
+					for(int w = 0; w < df_2_splines; w++)
 						params[p](w, t) = params[p_sample](w, t - 1) + perturb_kernel(gen);
 					
 				}
@@ -110,10 +112,10 @@ smc_results abc_smc::process_abc_smc(
                         std::abs(sample_ward_counts[d] - input_data.known_ward_occupancy[d]) > std::max(input_data.known_ward_occupancy[d] * input_data.thresholds[t], 10.0f)) {
                         rejected = true;
                     }
-                    // if(known_ICU[t] != -1 &&
-                    //     std::abs(sample_ICU_counts[t] - known_ICU[t]) > std::max(known_ICU[t] * thresholds[i_threshold] * 2, 10.0f)) {
-                    //     rejected = true;
-                    // }
+                    if(input_data.known_ICU_occupancy[d] != -1 &&
+                        std::abs(sample_ICU_counts[d] - input_data.known_ICU_occupancy[d]) > std::max(input_data.known_ICU_occupancy[d] * input_data.thresholds[t] * 1.5f, 10.0f)) {
+                        rejected = true;
+                    }
                 }
 
                 if(!rejected)
@@ -127,20 +129,18 @@ smc_results abc_smc::process_abc_smc(
             if(t == input_data.thresholds.size() - 1) {
                 results[p] = sample_results;
 
-                pr_hosp_fits[p] = input_data.spline_basis * spline_params;
-
             } else if (t == 0) {
 				weights(p, t) = 1;
 			} else {
 				double numer = 1;
-				for(int w = 0; w < df_spline; w++)
+				for(int w = 0; w < df_2_splines; w++)
 					numer *= normal_pdf(params[p](w, t), 0, 1);
 				
 				double denom = 0;
 
 				for(int j = 0; j < n_particles; j++) {
 					double prob_product = 1;
-					for(int w = 0; w < df_spline; w++) 
+					for(int w = 0; w < df_2_splines; w++) 
 						prob_product *= normal_pdf(params[j](w, t), params[j](w, t - 1), perturb_sigma);
 
 					denom += weights(j, t - 1) * prob_product;
@@ -155,7 +155,6 @@ smc_results abc_smc::process_abc_smc(
     results_obj.results = results;
     results_obj.weights = weights;
     results_obj.attempts = attempts;
-    results_obj.pr_hosp_fits = pr_hosp_fits;
     
 
     return results_obj;
@@ -172,21 +171,29 @@ std::vector<mush_results> abc_smc::process_strats(
 ) {
     std::vector<mush_results> sample_results(def_n_strats);
 
-    arma::vec pr_hosp_offset = input_data.spline_basis * spline_params;
 
+    arma::vec pr_hosp_offset = input_data.spline_basis * spline_params.head(spline_params.size() / 2);
+    arma::vec los_offset = input_data.spline_basis * spline_params.tail(spline_params.size() / 2);
 
     mush_params sim_params {
         .n_days = input_data.n_days,
         .steps_per_day = input_data.steps_per_day,
         .n_delay_samples = input_data.n_delay_samples
     };
+    
+    std::vector<float> los_offset_curve = make_los_offset_curve(
+        los_offset,
+        input_data.day_start_fit, input_data.day_end_fit,
+        input_data.n_days
+    );
+        
 
     for (int s = 0; s < def_n_strats; s++)
     {
         strat_data s_data = input_data.strat_datas[s][i_prior % input_data.n_strat_samples];
 
 
-        std::vector<int> hospitalised_cases = sample_hospitalised_cases_spline_B(
+        std::vector<int> hospitalised_cases = sample_hospitalised_cases_spline(
             input_data.case_curves[s][i_prior],
             input_data.pr_hosp_curves[s][i_prior],
 
@@ -196,13 +203,11 @@ std::vector<mush_results> abc_smc::process_strats(
             rng
         );
 
-
-        
         sample_results[s] = musher::mush_curve(
             sim_params,
             hospitalised_cases,
             s_data,
-            0,
+            los_offset_curve,
             input_data.pr_ICU_curves[s][i_prior]
         );
     }
