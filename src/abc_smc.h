@@ -15,8 +15,9 @@ public:
 
     static std::vector<mush_results> process_strats(
         const smc_inputs &input_data,
+        float pr_hosp_offset,
+        float los_offset,
         int i_prior,
-        arma::vec spline_params,
         std::mt19937 &rng
     );
 };

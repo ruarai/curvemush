@@ -21,8 +21,6 @@ public:
 
     std::vector<float> thresholds;
 
-    arma::mat spline_basis;
-
     int n_days;
     int n_delay_samples;
     int steps_per_day;
@@ -31,15 +29,11 @@ public:
 
     int n_parameter_samples;
     int n_strat_samples;
-
-    int day_start_fit;
-    int day_end_fit;
 };
 
 class smc_results {
 public:
     std::vector<std::vector<mush_results>> results;
-    std::vector<arma::vec> pr_hosp_fits;
 
     arma::mat weights;
     arma::mat attempts;

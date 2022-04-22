@@ -26,7 +26,7 @@ public:
 
       strat_data g_data,
 
-      std::vector<float> los_offset,
+      float scale_los,
 
       std::vector<float> pr_ICU_curve
   );
@@ -37,12 +37,9 @@ public:
       std::vector<int> &arr,
       F ix,
       
-      std::vector<float> &ward_to_discharge_delays,
-      std::vector<float> &ward_to_ICU_delays,
-      std::vector<float> &ward_to_death_delays,
-
-      std::vector<float> &los_offset,
-
+      std::vector<int> &ward_to_discharge_delays,
+      std::vector<int> &ward_to_ICU_delays,
+      std::vector<int> &ward_to_death_delays,
       float pr_ward_to_discharge,
       float pr_ward_to_ICU,
       
@@ -57,9 +54,9 @@ public:
       std::vector<int> &arr,
       F ix,
       
-      std::vector<float> &ICU_to_discharge_delays,
-      std::vector<float> &ICU_to_death_delays,
-      std::vector<float> &ICU_to_postICU_delays,
+      std::vector<int> &ICU_to_discharge_delays,
+      std::vector<int> &ICU_to_death_delays,
+      std::vector<int> &ICU_to_postICU_delays,
       float pr_ICU_to_discharge,
       float pr_ICU_to_postICU,
       float pr_postICU_to_death,
@@ -78,13 +75,12 @@ public:
       int t,
       std::vector<int> &arr,
       F ix,
-      std::vector<float> &delay_samples,
-      int n_steps,
-      std::vector<float> &los_offset
+      std::vector<int> &delay_samples,
+      int n_steps
     );
   
 private:
-  static std::vector<float> make_delay_samples(
+  static std::vector<int> make_delay_samples(
       int n_samples, double shape, double scale, int steps_per_day, std::mt19937 &rand
   );
   

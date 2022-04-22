@@ -35,12 +35,7 @@ List mush_abc_smc(
     std::vector<float> thresholds_vec,
     
     std::vector<int> known_ward_vec,
-    std::vector<int> known_ICU_vec,
-
-    int day_start_fit,
-    int day_end_fit,
-
-    arma::mat spline_basis
+    std::vector<int> known_ICU_vec
 ) {
     int n_strat_samples = forecasting_parameters.nrow() / def_n_strats;
 
@@ -60,16 +55,11 @@ List mush_abc_smc(
 
     input_data.n_parameter_samples = n_parameter_samples;
     input_data.n_strat_samples = n_strat_samples;
-
-    input_data.day_start_fit = day_start_fit;
-    input_data.day_end_fit = day_end_fit;
     
     input_data.known_ward_occupancy = known_ward_vec;
     input_data.known_ICU_occupancy = known_ICU_vec;
 
     input_data.thresholds = thresholds_vec;
-
-    input_data.spline_basis = spline_basis;
 
     for(int s = 0; s < def_n_strats; s++) {
         for(int i = 0; i < n_strat_samples; i++)
@@ -211,8 +201,6 @@ List mush_abc_smc(
         _["grouped_results"] = R_grped_results,
 
         _["smc_weights"] = smc_out.weights,
-        _["smc_attempts"] = smc_out.attempts//,
-
-        //_["smc_spline_fits"] = smc_out.spline_fits
+        _["smc_attempts"] = smc_out.attempts
     );
 }
