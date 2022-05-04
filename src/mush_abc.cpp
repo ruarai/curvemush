@@ -45,12 +45,10 @@ List mush_abc(
     params.steps_per_day = steps_per_day;
     params.n_delay_samples = n_delay_samples;
 
-    int n_strat_samples = forecasting_parameters.nrow() / def_n_strats;
     std::vector<strat_data> strat_datas(n_samples * def_n_strats);
 
     for (int i = 0; i < n_samples * def_n_strats; i++)
-        strat_datas[i] = strat_data::read_strat_data(forecasting_parameters, i);
-
+        strat_datas[i] = strat_data::read_strat_data(forecasting_parameters, i % forecasting_parameters.nrow());
 
 
     // Define and initialize our hospitalisation curves (vector of vectors of vectors)
@@ -135,7 +133,7 @@ List mush_abc(
         // that do not match true ICU or ward occupancy counts +- the threshold (proportionally)
         RcppThread::parallelFor(
             0, n_outputs,
-            [&results, params, &case_curves, strat_datas, n_strat_samples, known_ward, known_ICU, n_samples,
+            [&results, params, &case_curves, strat_datas, known_ward, known_ICU, n_samples,
             &los_scale_samples, &pr_hosp_scale_samples, &prior_chosen, &n_rejected, &n_accepted, thresholds,
              i_threshold, max_rejections, do_ABC, &pr_hosp_curves, &pr_ICU_curves](unsigned int i)
             {
@@ -156,7 +154,8 @@ List mush_abc(
 
                     for (int s = 0; s < def_n_strats; s++)
                     {
-                        strat_data s_data = strat_datas[i_prior % n_strat_samples + s];
+
+                        strat_data s_data = strat_datas[i_prior * def_n_strats + s];
 
 
                         std::vector<int> hospitalised_cases = sample_hospitalised_cases(
@@ -212,7 +211,7 @@ List mush_abc(
                         n_accepted[i_threshold]++;
 
                         rejected = false;
-                    } else{
+                    } else {
                         n_rejected[i_threshold]++;
                     }
                 }
@@ -274,8 +273,6 @@ List mush_abc(
     NumericVector grped_compartment_group_count(grped_n_results);
     NumericVector grped_compartment_group_transitions(grped_n_results);
 
-
-
     for (int i = 0; i < n_outputs; i++)
     {
         for (int x = 0; x < grped_result_size; x++)
@@ -304,9 +301,50 @@ List mush_abc(
         _["transitions"] = grped_compartment_group_transitions
     );
 
+    
+    // Build out our result dataframe to return
+    int aged_grped_n_results = n_outputs * grped_result_size * def_n_strats;
+
+    NumericVector aged_grped_sample_label(aged_grped_n_results);
+    NumericVector aged_grped_t_day(aged_grped_n_results);
+    NumericVector aged_grped_age_group(aged_grped_n_results);
+    NumericVector aged_grped_compartment_group_label(aged_grped_n_results);
+    NumericVector aged_grped_compartment_group_count(aged_grped_n_results);
+    NumericVector aged_grped_compartment_group_transitions(aged_grped_n_results);
+
+    int ix = 0;
+    for (int i = 0; i < n_outputs; i++)
+    {
+        for (int x = 0; x < grped_result_size; x++)
+        {
+            for (int s = 0; s < def_n_strats; s++)
+            {
+                aged_grped_sample_label[ix] = i;
+                aged_grped_t_day[ix] = x % params.n_days;
+                aged_grped_compartment_group_label[ix] = results[i][s].grouped_occupancy_compartment_labels[x];
+                aged_grped_age_group[ix] = s;
+
+                aged_grped_compartment_group_count[ix] = results[i][s].grouped_occupancy_counts[x];
+                aged_grped_compartment_group_transitions[ix] = results[i][s].grouped_transitions[x];
+
+                ix++;
+            }
+        }
+    }
+
+    DataFrame R_aged_grped_results = DataFrame::create(
+        _["sample"] = aged_grped_sample_label,
+        _["t_day"] = aged_grped_t_day,
+        _["compartment_group"] = aged_grped_compartment_group_label,
+        _["age_group"] = aged_grped_age_group,
+        _["count"] = aged_grped_compartment_group_count,
+        _["transitions"] = aged_grped_compartment_group_transitions
+    );
+
     return List::create(
         _["results"] = R_results,
         _["grouped_results"] = R_grped_results,
+        _["age_stratified_grouped_results"] = R_aged_grped_results,
 
         _["n_rejected"] = n_rejected,
         _["n_accepted"] = n_accepted,

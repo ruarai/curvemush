@@ -7,6 +7,7 @@ strat_data strat_data::read_strat_data(DataFrame forecasting_parameters, int str
     strat_data data;
 
     data.pr_ward_to_discharge = as<NumericVector>(forecasting_parameters["pr_ward_to_discharge"])[strat_ix];
+    data.pr_ward_to_ICU = as<NumericVector>(forecasting_parameters["pr_ward_to_ICU"])[strat_ix];
 
     data.pr_ICU_to_discharge = as<NumericVector>(forecasting_parameters["pr_ICU_to_discharge"])[strat_ix];
     data.pr_ICU_to_postICU = as<NumericVector>(forecasting_parameters["pr_ICU_to_postICU"])[strat_ix];
