@@ -12,6 +12,7 @@
 
 using namespace Rcpp;
 
+//' @export
 // [[Rcpp::export]]
 List mush_abc(
     int n_samples,
