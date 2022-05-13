@@ -3,8 +3,8 @@
 
 #' Perform simulation and optionally fitting
 #' @export
-mushabc <- function(n_samples, n_delay_samples, n_outputs, n_days, steps_per_day, thresholds_vec, rejections_per_selections, do_ABC, ensemble_curves, mat_pr_age_given_case, mat_pr_hosp, mat_pr_ICU, forecasting_parameters, known_ward_vec, known_ICU_vec, prior_sigma_los, prior_sigma_hosp) {
-    .Call('_curvemush_mushabc', PACKAGE = 'curvemush', n_samples, n_delay_samples, n_outputs, n_days, steps_per_day, thresholds_vec, rejections_per_selections, do_ABC, ensemble_curves, mat_pr_age_given_case, mat_pr_hosp, mat_pr_ICU, forecasting_parameters, known_ward_vec, known_ICU_vec, prior_sigma_los, prior_sigma_hosp)
+mush_abc <- function(n_samples, n_delay_samples, n_outputs, n_days, steps_per_day, thresholds_vec, rejections_per_selections, do_ABC, ensemble_curves, mat_pr_age_given_case, mat_pr_hosp, mat_pr_ICU, forecasting_parameters, known_ward_vec, known_ICU_vec, prior_sigma_los, prior_sigma_hosp) {
+    .Call('_curvemush_mush_abc', PACKAGE = 'curvemush', n_samples, n_delay_samples, n_outputs, n_days, steps_per_day, thresholds_vec, rejections_per_selections, do_ABC, ensemble_curves, mat_pr_age_given_case, mat_pr_hosp, mat_pr_ICU, forecasting_parameters, known_ward_vec, known_ICU_vec, prior_sigma_los, prior_sigma_hosp)
 }
 
 mush_abc_smc <- function(n_parameter_samples, n_particles, n_delay_samples, n_days, steps_per_day, ensemble_curves, mat_pr_age_given_case, mat_pr_hosp, mat_pr_ICU, forecasting_parameters, thresholds_vec, known_ward_vec, known_ICU_vec) {

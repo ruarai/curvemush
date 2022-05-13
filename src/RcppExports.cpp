@@ -12,9 +12,9 @@ Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
 Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
-// mushabc
-List mushabc(int n_samples, int n_delay_samples, int n_outputs, int n_days, int steps_per_day, NumericVector thresholds_vec, int rejections_per_selections, bool do_ABC, NumericMatrix ensemble_curves, NumericMatrix mat_pr_age_given_case, NumericMatrix mat_pr_hosp, NumericMatrix mat_pr_ICU, DataFrame forecasting_parameters, IntegerVector known_ward_vec, IntegerVector known_ICU_vec, double prior_sigma_los, double prior_sigma_hosp);
-RcppExport SEXP _curvemush_mushabc(SEXP n_samplesSEXP, SEXP n_delay_samplesSEXP, SEXP n_outputsSEXP, SEXP n_daysSEXP, SEXP steps_per_daySEXP, SEXP thresholds_vecSEXP, SEXP rejections_per_selectionsSEXP, SEXP do_ABCSEXP, SEXP ensemble_curvesSEXP, SEXP mat_pr_age_given_caseSEXP, SEXP mat_pr_hospSEXP, SEXP mat_pr_ICUSEXP, SEXP forecasting_parametersSEXP, SEXP known_ward_vecSEXP, SEXP known_ICU_vecSEXP, SEXP prior_sigma_losSEXP, SEXP prior_sigma_hospSEXP) {
+// mush_abc
+List mush_abc(int n_samples, int n_delay_samples, int n_outputs, int n_days, int steps_per_day, NumericVector thresholds_vec, int rejections_per_selections, bool do_ABC, NumericMatrix ensemble_curves, NumericMatrix mat_pr_age_given_case, NumericMatrix mat_pr_hosp, NumericMatrix mat_pr_ICU, DataFrame forecasting_parameters, IntegerVector known_ward_vec, IntegerVector known_ICU_vec, double prior_sigma_los, double prior_sigma_hosp);
+RcppExport SEXP _curvemush_mush_abc(SEXP n_samplesSEXP, SEXP n_delay_samplesSEXP, SEXP n_outputsSEXP, SEXP n_daysSEXP, SEXP steps_per_daySEXP, SEXP thresholds_vecSEXP, SEXP rejections_per_selectionsSEXP, SEXP do_ABCSEXP, SEXP ensemble_curvesSEXP, SEXP mat_pr_age_given_caseSEXP, SEXP mat_pr_hospSEXP, SEXP mat_pr_ICUSEXP, SEXP forecasting_parametersSEXP, SEXP known_ward_vecSEXP, SEXP known_ICU_vecSEXP, SEXP prior_sigma_losSEXP, SEXP prior_sigma_hospSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -35,7 +35,7 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< IntegerVector >::type known_ICU_vec(known_ICU_vecSEXP);
     Rcpp::traits::input_parameter< double >::type prior_sigma_los(prior_sigma_losSEXP);
     Rcpp::traits::input_parameter< double >::type prior_sigma_hosp(prior_sigma_hospSEXP);
-    rcpp_result_gen = Rcpp::wrap(mushabc(n_samples, n_delay_samples, n_outputs, n_days, steps_per_day, thresholds_vec, rejections_per_selections, do_ABC, ensemble_curves, mat_pr_age_given_case, mat_pr_hosp, mat_pr_ICU, forecasting_parameters, known_ward_vec, known_ICU_vec, prior_sigma_los, prior_sigma_hosp));
+    rcpp_result_gen = Rcpp::wrap(mush_abc(n_samples, n_delay_samples, n_outputs, n_days, steps_per_day, thresholds_vec, rejections_per_selections, do_ABC, ensemble_curves, mat_pr_age_given_case, mat_pr_hosp, mat_pr_ICU, forecasting_parameters, known_ward_vec, known_ICU_vec, prior_sigma_los, prior_sigma_hosp));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -64,7 +64,7 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_curvemush_mushabc", (DL_FUNC) &_curvemush_mushabc, 17},
+    {"_curvemush_mush_abc", (DL_FUNC) &_curvemush_mush_abc, 17},
     {"_curvemush_mush_abc_smc", (DL_FUNC) &_curvemush_mush_abc_smc, 13},
     {NULL, NULL, 0}
 };

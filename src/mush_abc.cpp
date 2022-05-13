@@ -15,7 +15,7 @@ using namespace Rcpp;
 //' Perform simulation and optionally fitting
 //' @export
 // [[Rcpp::export]]
-List mushabc(
+List mush_abc(
     int n_samples,
     int n_delay_samples,
 
