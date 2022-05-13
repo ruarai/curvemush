@@ -13,7 +13,7 @@
 using namespace Rcpp;
 
 // [[Rcpp::export]]
-List mush_abc(
+List mushabc(
     int n_samples,
     int n_delay_samples,
 
