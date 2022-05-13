@@ -9,3 +9,6 @@ Description: Simulates and fits clinical progression of COVID-19.
 License: GPL (>= 2)
 Imports: Rcpp (>= 1.0.7)
 LinkingTo: Rcpp, RcppArmadillo, RcppThread
+RoxygenNote: 7.1.2
+Encoding: UTF-8
+

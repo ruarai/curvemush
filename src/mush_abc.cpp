@@ -12,6 +12,8 @@
 
 using namespace Rcpp;
 
+//' Perform simulation and optionally fitting
+//' @export
 // [[Rcpp::export]]
 List mushabc(
     int n_samples,
