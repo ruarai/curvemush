@@ -28,7 +28,10 @@ public:
 
       float scale_los,
 
-      std::vector<float> pr_ICU_curve
+      std::vector<float> pr_ICU_curve,
+
+      std::vector<float> shape_ward_to_discharge,
+      std::vector<float> scale_ward_to_discharge
   );
   
   template <typename F>

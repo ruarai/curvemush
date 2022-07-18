@@ -13,6 +13,7 @@
 using namespace Rcpp;
 
 // Perform simulation and optionally fitting
+// [[Rcpp::export]]
 List mush_abc(
     int n_samples,
     int n_delay_samples,
@@ -31,6 +32,9 @@ List mush_abc(
     NumericMatrix mat_pr_age_given_case,
     NumericMatrix mat_pr_hosp,
     NumericMatrix mat_pr_ICU,
+
+    std::vector<float> shape_ward_to_discharge,
+    std::vector<float> scale_ward_to_discharge,
 
     DataFrame forecasting_parameters,
     
@@ -135,7 +139,8 @@ List mush_abc(
             0, n_outputs,
             [&results, params, &case_curves, strat_datas, known_ward, known_ICU, n_samples,
             &los_scale_samples, &pr_hosp_scale_samples, &prior_chosen, &n_rejected, &n_accepted, thresholds,
-             i_threshold, max_rejections, do_ABC, &pr_hosp_curves, &pr_ICU_curves](unsigned int i)
+             i_threshold, max_rejections, do_ABC, &pr_hosp_curves, &pr_ICU_curves,
+             &shape_ward_to_discharge, &scale_ward_to_discharge](unsigned int i)
             {
 
                 bool rejected = true;
@@ -172,7 +177,10 @@ List mush_abc(
                             hospitalised_cases,
                             s_data,
                             los_scale_samples[i_prior],
-                            pr_ICU_curves[s][i_prior]
+                            pr_ICU_curves[s][i_prior],
+
+                            shape_ward_to_discharge,
+                            scale_ward_to_discharge
                         );
                     }
                     

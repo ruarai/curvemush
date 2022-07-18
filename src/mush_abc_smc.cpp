@@ -15,7 +15,6 @@
 using namespace Rcpp;
 
 
-// [[Rcpp::export]]
 List mush_abc_smc(
     int n_parameter_samples,
     int n_particles,
