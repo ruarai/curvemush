@@ -31,3 +31,17 @@
 #define cgrp_ICU 2
 #define cgrp_discharged 3
 #define cgrp_died 4
+
+
+#define def_n_delay_groups 8
+
+#define gg_ward_to_discharge 0
+#define gg_ward_to_ICU 1
+#define gg_ward_to_death 2
+
+#define gg_ICU_to_discharge 3
+#define gg_ICU_to_postICU 4
+#define gg_ICU_to_death 5
+
+#define gg_postICU_to_discharge 6
+#define gg_postICU_to_death 7

@@ -30,8 +30,9 @@ public:
 
       std::vector<float> pr_ICU_curve,
 
-      std::vector<float> shape_ward_to_discharge,
-      std::vector<float> scale_ward_to_discharge
+      std::vector<std::vector<float>> mu,
+      std::vector<std::vector<float>> sigma,
+      std::vector<std::vector<float>> Q
   );
   
   template <typename F>
@@ -85,6 +86,9 @@ public:
 private:
   static std::vector<int> make_delay_samples(
       int n_samples, double shape, double scale, int steps_per_day, std::mt19937 &rand
+  );
+  static std::vector<int> make_delay_samples_gengamma(
+      int n_samples, double mu, double sigma, double Q, int steps_per_day, std::mt19937 &rand
   );
   
   static int group_compartment(int compartment_id);

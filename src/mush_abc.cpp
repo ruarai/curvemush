@@ -33,8 +33,7 @@ List mush_abc(
     NumericMatrix mat_pr_hosp,
     NumericMatrix mat_pr_ICU,
 
-    std::vector<float> shape_ward_to_discharge,
-    std::vector<float> scale_ward_to_discharge,
+    DataFrame delay_parameters,
 
     DataFrame forecasting_parameters,
     
@@ -110,6 +109,24 @@ List mush_abc(
         }
     }
 
+
+    std::vector<std::vector<std::vector<float>>> delays_mu(def_n_strats, std::vector<std::vector<float>>(def_n_delay_groups, std::vector<float>(params.n_days)));
+    std::vector<std::vector<std::vector<float>>> delays_sigma(def_n_strats, std::vector<std::vector<float>>(def_n_delay_groups, std::vector<float>(params.n_days)));
+    std::vector<std::vector<std::vector<float>>> delays_Q(def_n_strats, std::vector<std::vector<float>>(def_n_delay_groups, std::vector<float>(params.n_days)));
+
+    for(int i = 0; i < delay_parameters.nrows(); i++) {
+        int ix_age = as<NumericVector>(delay_parameters["age"])[i];
+        int ix_coding = as<NumericVector>(delay_parameters["coding"])[i];
+        int ix_date = as<NumericVector>(delay_parameters["date"])[i];
+
+        delays_mu[ix_age][ix_coding][ix_date] =  as<NumericVector>(delay_parameters["mu"])[i];
+        delays_sigma[ix_age][ix_coding][ix_date] = as<NumericVector>(delay_parameters["sigma"])[i];
+        delays_Q[ix_age][ix_coding][ix_date] = as<NumericVector>(delay_parameters["Q"])[i];
+    }
+
+
+
+
     std::vector<float> los_scale_samples(n_samples);
     std::vector<float> pr_hosp_scale_samples(n_samples);
     std::vector<int> known_ward = as<std::vector<int>>(known_ward_vec);
@@ -140,7 +157,7 @@ List mush_abc(
             [&results, params, &case_curves, strat_datas, known_ward, known_ICU, n_samples,
             &los_scale_samples, &pr_hosp_scale_samples, &prior_chosen, &n_rejected, &n_accepted, thresholds,
              i_threshold, max_rejections, do_ABC, &pr_hosp_curves, &pr_ICU_curves,
-             &shape_ward_to_discharge, &scale_ward_to_discharge](unsigned int i)
+             &delays_mu, &delays_sigma, &delays_Q](unsigned int i)
             {
 
                 bool rejected = true;
@@ -179,8 +196,9 @@ List mush_abc(
                             los_scale_samples[i_prior],
                             pr_ICU_curves[s][i_prior],
 
-                            shape_ward_to_discharge,
-                            scale_ward_to_discharge
+                            delays_mu[s],
+                            delays_sigma[s],
+                            delays_Q[s]
                         );
                     }
                     
