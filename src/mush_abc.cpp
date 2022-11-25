@@ -198,11 +198,11 @@ List mush_abc(
 
                     for(int t = 0; t < params.n_days; t++) {
                         if(known_ward[t] != -1 && 
-                            std::abs(ward_counts[t] - known_ward[t]) > std::max(known_ward[t] * thresholds[i_threshold], 10.0f)) {
+                            std::abs(ward_counts[t] - known_ward[t]) > std::max(known_ward[t] * thresholds[i_threshold], 2.0f)) {
                             rejected = true;
                         }
                         if(known_ICU[t] != -1 && 
-                            std::abs(ICU_counts[t] - known_ICU[t]) > std::max(known_ICU[t] * thresholds[i_threshold] * 2, 10.0f)) {
+                            std::abs(ICU_counts[t] - known_ICU[t]) > std::max(known_ICU[t] * thresholds[i_threshold] * 2, 2.0f)) {
                             rejected = true;
                         }
                     }
