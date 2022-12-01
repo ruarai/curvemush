@@ -202,7 +202,7 @@ List mush_abc(
                             rejected = true;
                         }
                         if(known_ICU[t] != -1 && 
-                            std::abs(ICU_counts[t] - known_ICU[t]) > std::max(known_ICU[t] * thresholds[i_threshold] * 2, 2.0f)) {
+                            std::abs(ICU_counts[t] - known_ICU[t]) > std::max(known_ICU[t] * thresholds[i_threshold], 2.0f)) {
                             rejected = true;
                         }
                     }
