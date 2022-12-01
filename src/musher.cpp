@@ -71,7 +71,7 @@ mush_results musher::mush_curve(
   
   
   std::vector<int> ICU_to_discharge_delays = musher::make_delay_samples(
-    params.n_delay_samples, s_data.d_shape_ICU_to_discharge, s_data.pr_ICU_to_discharge,
+    params.n_delay_samples, s_data.d_shape_ICU_to_discharge, s_data.d_scale_ICU_to_discharge,
     params.steps_per_day, rand);
   std::vector<int> ICU_to_death_delays = musher::make_delay_samples(
     params.n_delay_samples, s_data.d_shape_ICU_to_death, s_data.d_scale_ICU_to_death,
