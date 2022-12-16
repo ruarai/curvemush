@@ -56,7 +56,7 @@ mush_results musher::mush_curve(
   std::mt19937 rand(rd());
   
   std::vector<int> symptomatic_ward_delays = musher::make_delay_samples(
-    params.n_delay_samples, std::exp(std::log(s_data.d_shape_symptomatic_to_ward) + scale_los), s_data.d_scale_symptomatic_to_ward,
+    params.n_delay_samples, s_data.d_shape_symptomatic_to_ward, s_data.d_scale_symptomatic_to_ward,
     params.steps_per_day, rand);
   
   std::vector<int> ward_to_discharge_delays = musher::make_delay_samples(
